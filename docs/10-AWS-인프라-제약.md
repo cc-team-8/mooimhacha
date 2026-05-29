@@ -8,11 +8,11 @@
 | --- | --- |
 | **EC2** (t3.nano ~ t3.small) | NestJS 서버 + (필요 시) 보조 컨테이너 |
 | **RDS** (MySQL/postgres 프리티어) | MySQL — 회의·발화·기여도 영구 저장 |
-| **S3** | (옵션) 회의 종료 후 정리 리포트·DB 백업 |
-| **Lambda** | (옵션) 회의 후 GPT-4o-mini 호출용 비동기 작업 |
+| **S3** | **액션 아이템 첨부 파일 저장** (Presigned URL 업로드) + (옵션) 정리 리포트·DB 백업 |
+| **Lambda** | (사용 안 함 — 회의 후 GPT-4o-mini 호출은 NestJS 서버 내 직접 처리, 2026-05-29 결정) |
 | **DynamoDB** | (사용 안 함 — MySQL로 충분) |
 | **API Gateway** | (옵션) WSS가 꼭 필요할 때 WebSocket API |
-| **Amplify** | (사용 안 함 — Electron 앱이라 정적 호스팅 불필요) |
+| **Amplify** | (옵션) 웹 프론트 정적 호스팅 — 기본안은 EC2의 Caddy가 정적 빌드를 서빙하므로 미사용, 분리 호스팅 시 후보 |
 | **SQS / SNS** | (옵션) 회의 후 분석 큐 |
 | **Bedrock** (us-east-1 / us-east-2 / us-west-1 / us-west-2) | (옵션) OpenAI 대신 Claude 등 사용 시 |
 
@@ -21,8 +21,8 @@
 | 막힌 서비스 | 우리 대안 |
 | --- | --- |
 | **Cognito** | 카카오 OAuth + 백엔드 자체 JWT ([02-기능-명세](02-기능-명세.md) §인증) |
-| **Route 53 / ACM** | EC2 퍼블릭 IP 직접 접속, HTTP/WS (Electron 앱이라 브라우저 보안 정책 무관) |
-| **CloudFront** | 불필요 — Electron 앱이 직접 서버 호출 |
+| **Route 53 / ACM** | 웹앱은 **HTTPS 필수**(getUserMedia·Web Speech API). 외부 등록처에서 도메인 발급 후 **EC2의 Caddy + Let's Encrypt로 자동 TLS** (ACM 없이). `https://` 정적 서빙 + `wss://` 프록시 |
+| **CloudFront** | 기본 불필요 — 단일 EC2의 Caddy가 정적 프론트를 직접 서빙. 트래픽·캐싱 필요 시 재검토(옵션) |
 | **ElastiCache** | NestJS 프로세스 **인메모리 Map** + 5초마다 RDS flush ([01-아키텍처](01-아키텍처.md) §데이터 흐름) |
 | **ELB / Auto Scaling / DB Cluster** | 단일 EC2 + 단일 RDS. 4인 이하 팀, 회의 단위 트래픽이라 불필요 |
 | **VPC 커스텀 (Private Subnet, NAT, Endpoint)** | 기본 VPC + Public Subnet + Security Group |
@@ -45,8 +45,16 @@
 - **인스턴스 프로필 필수**: `SafeInstanceProfileForUser-{username}`
 - 보안 그룹: 생성 시 모든 허용 규칙 해제 → 인스턴스 생성 후 ingress rule 추가
   - 22 (SSH) — 본인 IP만
-  - 80 / 3000 (NestJS) — 0.0.0.0/0
-  - 3000 또는 운영 포트 1개만 외부 노출
+  - 80 (HTTP→HTTPS 리다이렉트 + Let's Encrypt 갱신) — 0.0.0.0/0
+  - 443 (HTTPS/WSS, Caddy) — 0.0.0.0/0
+  - NestJS(3000)는 외부 비노출 — Caddy가 내부에서 프록시
+
+### 도메인·HTTPS (웹앱)
+
+- 웹 MVP는 `getUserMedia`·Web Speech API가 **보안 컨텍스트(HTTPS)** 를 요구하므로 HTTPS가 필수다(localhost 예외).
+- ACM/Route 53은 막혀 있으므로 **외부 등록처에서 도메인을 발급**받고 EC2의 **Caddy + Let's Encrypt**로 자동 TLS를 적용한다.
+- Caddy가 한 EC2에서 ① 정적 프론트(React 빌드) 서빙 ② `wss://` → NestJS WebSocket 프록시 ③ `/api` → NestJS 프록시를 모두 담당한다.
+- 도메인 발급·DNS 운영 주체는 추후 확정([09](09-미결정-사항.md)).
 
 ### RDS
 
@@ -60,9 +68,12 @@
 - 함수 생성 시 **새 역할 X**, 기존 역할 `SafeRoleForUser-{username}` 선택
 - 최초 생성 직후 5초 정도 지연 — 새로고침 후 정상 접근
 
-### S3 (사용할 경우)
+### S3 (액션 첨부 파일 저장)
 
 - 버킷 이름은 **`{username}-...`** 로 시작 (예: `2026-inha-cc-15-backup`)
+- 업로드 방식: **Presigned URL** — NestJS가 발급, 클라이언트가 S3에 직접 업로드 (서버 대역폭 절약)
+- 허용 형식: **문서(PDF/doc/docx/xls/ppt) + 이미지(png/jpg), 파일당 10MB** (2026-05-29 결정)
+- 접근: EC2 인스턴스 프로필(`SafeInstanceProfileForUser-{username}`)로 SDK 권한
 
 ### Access Key
 
@@ -71,8 +82,8 @@
 
 ### 환경 변수 / 시크릿
 
-- OpenAI API 키, 카카오 클라이언트 시크릿, DB 패스워드 등은 EC2 안 `.env` 파일에 둔다.
-- Secrets Manager / SSM Parameter Store는 권한 범위 확인 후 사용 결정 (필요시 추가 요청).
+- OpenAI API 키, 카카오 클라이언트 시크릿, DB 패스워드 등은 EC2 안 `.env` 파일에 둔다 (**2026-05-29 확정**).
+- Secrets Manager / SSM Parameter Store는 사용하지 않는다 (MVP·4인 팀 규모에 `.env`로 충분). 향후 필요 시 재검토.
 
 ## 배포 흐름
 
@@ -94,7 +105,7 @@
 | Auto Scaling | 4인 이하 팀의 회의 트래픽으로 스케일 이슈 없음 |
 | ELB | EC2 1대에 LB 불필요. WSS 필요 시 API Gateway WebSocket으로 대체 가능 |
 | ElastiCache | 인메모리 Map으로 충분, 영구화는 RDS flush로 |
-| CloudFront | Electron 앱이 직접 서버 호출, 정적 자산은 앱에 동봉 |
+| CloudFront | 단일 EC2의 Caddy가 정적 프론트를 직접 서빙. 학기 프로젝트 트래픽에 CDN 불필요 |
 | Cognito | 카카오 로그인이라 직접 JWT 발급이 더 단순 |
 | GitHub Actions CI/CD | Access Key 발급 불가, 수동 배포 ROI가 더 좋음 |
 

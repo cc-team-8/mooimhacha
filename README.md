@@ -24,25 +24,26 @@
 회의 앱 옆에 띄우는 always-on-top 사이드 창. 곁눈질로 회의 상태를 파악한다.
 
 - **안건 추적** — 아젠다 진행 상태(대기/진행 중/완료)와 시간 초과 시각화
-- **실시간 기여도 바** — 발언 비중·역할 수행도를 막대로 표시 (WebSocket 브로드캐스트, Framer Motion)
-- **결정·액션 빠른 입력** — 단축키로 결정사항·액션 아이템을 즉시 기록
+- **실시간 기여도 바** — 회의 중에는 발언 비중을 막대로 표시 (WebSocket 브로드캐스트 1초 디바운스, Framer Motion). 역할 수행도 등 3축 종합은 회의 후 대시보드에서 확인
+- **결정·액션 빠른 입력** — 단축키(Ctrl/Cmd+D · Ctrl/Cmd+A)로 결정사항·액션 아이템을 즉시 기록, 현재 진행 안건에 자동 연결
 - **로컬 STT** — 음성은 각자 기기에서 텍스트로 변환, 서버에는 텍스트만 전송
 
 ## 주요 제약
 
 | 제약 | 내용 |
 | --- | --- |
-| 운영 비용 0원 | STT는 클라이언트 로컬 추론(Moonshine)만 사용. 유료 STT API 금지 |
+| 운영 비용 0원 | STT는 클라이언트 로컬 추론(RealtimeSTT, faster-whisper)만 사용. 유료 STT API 금지 |
 | 음성 원본 미저장 | 음성은 기기 밖으로 나가지 않음. 서버에는 텍스트만 전송·저장 |
 | 방식 B (각자 녹음) | 각자 본인 마이크로 본인 발화만 수집 → 화자 분리 불필요 |
 | 사이드 창 폭 | 회의 중 보조 창은 폭 400px 고정 |
+| 팀 인원 상한 | 6명 (대학생 팀플 기준 하드 제한) |
 | LLM 사용 | GPT-4o-mini. 회의 중 안건별 요약(안건당 1회) + 회의 후 종합 정리 1회 + 다음 회의 안건 생성 1회 |
 
 ## 기술 스택 요약
 
 - **클라이언트**: Electron · React · TypeScript · TailwindCSS · shadcn/ui · Framer Motion
-- **STT**: Moonshine ONNX (`transformers.js`) + Silero VAD (`@ricky0123/vad-web`)
-- **백엔드**: NestJS · MySQL · WebSocket (캐시는 NestJS 인메모리 — ElastiCache 미사용)
+- **STT**: RealtimeSTT (Python, faster-whisper) — Electron 사이드카(PyInstaller 번들, `child_process` stdio NDJSON). 모델 크기(tiny/base/small)는 1주차 PoC 후 확정
+- **백엔드**: NestJS · MySQL (TypeORM) · WebSocket (캐시는 NestJS 인메모리 — ElastiCache 미사용)
 - **인프라**: AWS (Start AWS 학생 프로그램) — EC2 t3.small · RDS MySQL 프리티어 · 서울 리전
 - **LLM**: OpenAI GPT-4o-mini (회의 중 안건당 1회 + 회의 후 2회)
 
@@ -75,7 +76,10 @@
 ├── client/                      # Electron 클라이언트 (Vite + React + TS)
 │   ├── electron/                #   메인 프로세스 (Node 컨텍스트)
 │   │   ├── main/                #     BrowserWindow·IPC·자동 업데이트
+│   │   │   └── stt-sidecar/     #       RealtimeSTT 사이드카 spawn·stdio·재시작
 │   │   └── preload/             #     렌더러 ↔ 메인 브리지
+│   ├── resources/
+│   │   └── stt-sidecar/         #   PyInstaller로 번들된 RealtimeSTT 실행파일
 │   ├── src/                     #   렌더러 (React 컨텍스트)
 │   │   ├── main.tsx             #     ReactDOM 진입점
 │   │   ├── App.tsx              #     루트 컴포넌트
@@ -103,8 +107,8 @@
 | [02. 기능 명세](docs/02-기능-명세.md) | 회의 전/중/후/외 기능 |
 | [03. 데이터 모델](docs/03-데이터-모델.md) | 엔티티·필드 정의 |
 | [04. API 명세](docs/04-API-명세.md) | REST, WebSocket |
-| [05. STT 음성 처리](docs/05-STT-음성-처리.md) | Moonshine, VAD, PoC |
-| [06. 기여도 산정](docs/06-기여도-산정.md) | 3축 지표·공식·엣지 케이스 |
+| [05. STT 음성 처리](docs/05-STT-음성-처리.md) | RealtimeSTT 사이드카, VAD, PoC |
+| [06. 기여도 산정](docs/06-기여도-산정.md) | 3축 공식 (액션·발언·참석), 누적 점수 |
 | [07. Electron 구현](docs/07-Electron-구현.md) | 윈도우 관리, 빌드 |
 | [08. 우선순위 & 로드맵](docs/08-우선순위-로드맵.md) | P0/P1/V2, 8주 일정 |
 | [09. 미결정 사항](docs/09-미결정-사항.md) | 착수 전 결정 필요 항목 |
@@ -134,7 +138,7 @@
 | `test` | 테스트 추가/수정 |
 | `chore` | 빌드·설정·잡일 |
 
-예시: `feat(stt): Moonshine 추론 파이프라인 추가`
+예시: `feat(stt): RealtimeSTT 사이드카 통합 추가`
 
 ### PR
 
