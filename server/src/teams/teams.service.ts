@@ -49,12 +49,10 @@ export class TeamsService {
     const allUserIds = [
       ...new Set(allMemberships.map((m) => Number(m.user_id))),
     ];
-    const users = await this.dataSource
-      .getRepository(User)
-      .find({
-        where: { id: In(allUserIds) },
-        select: { id: true, name: true },
-      });
+    const users = await this.dataSource.getRepository(User).find({
+      where: { id: In(allUserIds) },
+      select: { id: true, name: true },
+    });
     const userMap = new Map(users.map((u) => [Number(u.id), u.name]));
 
     const membersByTeam = new Map<number, string[]>();
@@ -254,6 +252,15 @@ export class TeamsService {
         throw new NotFoundException('해당 멤버를 찾을 수 없습니다.');
       await this.membershipRepo.softDelete({ id: membership.id });
     }
+  }
+
+  // 2-8. 팀 삭제 (팀장만)
+  async deleteTeam(teamId: number, userId: number) {
+    await this.assertLeader(teamId, userId);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.softDelete(TeamMembership, { team_id: teamId });
+      await manager.softDelete(Team, { id: teamId });
+    });
   }
 
   // 3-1. 팀 설정 조회

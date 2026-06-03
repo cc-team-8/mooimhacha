@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
 import { apiFetch, authHeader } from "@/lib/apiFetch";
 import Card from "@/components/Card";
+import Modal from "@/components/Modal";
 import type { TeamContext } from "../DashboardPage";
 
 interface TeamDetail {
@@ -24,6 +25,7 @@ interface Settings {
 export default function SettingsPage() {
   const team = useOutletContext<TeamContext | null>();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const isLeader = team?.my_role === "leader";
 
   const [detail, setDetail] = useState<TeamDetail | null>(null);
@@ -32,6 +34,9 @@ export default function SettingsPage() {
   const [courseName, setCourseName] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!team) return;
@@ -104,6 +109,23 @@ export default function SettingsPage() {
       showToast((err as Error).message || "저장 실패");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!team || deleteConfirmName !== team.name) return;
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/teams/${team.id}`, {
+        method: "DELETE",
+        headers: authHeader(),
+      });
+      showToast(`${team.name} 팀이 삭제됐습니다`);
+      navigate("/home");
+    } catch (err) {
+      showToast((err as Error).message || "삭제 실패");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -351,6 +373,63 @@ export default function SettingsPage() {
             )}
           </div>
         </Card>
+      )}
+      {/* 팀 삭제 — 팀장만 */}
+      {isLeader && (
+        <Card icon="ti ti-trash" title="팀 삭제">
+          <div style={{ padding: "8px 16px 16px" }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--text-soft)",
+                margin: "0 0 12px",
+              }}
+            >
+              팀을 삭제하면 모든 멤버십·설정·기록이 영구적으로 사라집니다.
+            </p>
+            <button
+              className="btn btn-danger"
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              <i className="ti ti-trash" /> 팀 삭제
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* 삭제 확인 모달 */}
+      {deleteModalOpen && (
+        <Modal
+          title="팀 삭제 확인"
+          onClose={() => {
+            setDeleteModalOpen(false);
+            setDeleteConfirmName("");
+          }}
+          actions={
+            <button
+              className="btn btn-danger"
+              disabled={deleteConfirmName !== team.name || deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? "삭제 중..." : "삭제"}
+            </button>
+          }
+        >
+          <div className="modal-sub">
+            <p style={{ margin: "0 0 12px", fontSize: 13 }}>
+              정말 삭제하려면 팀 이름 <strong>{team.name}</strong>을 입력하세요.
+            </p>
+            <label className="field">
+              <input
+                className="input"
+                placeholder={team.name}
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                autoFocus
+              />
+            </label>
+          </div>
+        </Modal>
       )}
     </div>
   );
