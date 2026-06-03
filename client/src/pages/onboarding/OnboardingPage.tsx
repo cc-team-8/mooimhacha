@@ -14,9 +14,19 @@ export default function OnboardingPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  function copyCode() {
-    navigator.clipboard?.writeText(inviteCode).catch(() => {});
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = inviteCode;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
     setCopied(true);
+    showToast("초대코드가 복사됐습니다");
     setTimeout(() => setCopied(false), 2000);
   }
 
@@ -182,7 +192,11 @@ export default function OnboardingPage() {
                 <button
                   className="copy-btn"
                   onClick={copyCode}
-                  style={copied ? { color: "var(--green)" } : undefined}
+                  style={
+                    copied
+                      ? { background: "rgba(255,255,255,0.35)" }
+                      : undefined
+                  }
                 >
                   <i className={copied ? "ti ti-check" : "ti ti-copy"} />
                   {copied ? "복사됨" : "복사"}
