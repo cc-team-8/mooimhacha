@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
+import { getUser } from "@/lib/auth";
 import Card from "@/components/Card";
 import "@/styles/home.css";
 
@@ -138,6 +139,9 @@ const MEETINGS = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const user = getUser();
+  const userName = user?.name ?? "사용자";
+  const userInitial = userName[0];
   const [tasks, setTasks] = useState(TASKS);
   const [joinCode, setJoinCode] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -264,18 +268,46 @@ export default function HomePage() {
           <div className="profile-wrap" ref={profileRef}>
             <div
               className="av a1 av-md"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", overflow: "hidden" }}
               onClick={() => setProfileOpen((v) => !v)}
             >
-              김
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={userName}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                userInitial
+              )}
             </div>
             {profileOpen && (
               <div className="profile-dropdown">
                 <div className="pd-header">
-                  <div className="av a1 av-md">김</div>
+                  <div className="av a1 av-md" style={{ overflow: "hidden" }}>
+                    {user?.picture ? (
+                      <img
+                        src={user.picture}
+                        alt={userName}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      userInitial
+                    )}
+                  </div>
                   <div className="pd-info">
-                    <div className="pd-name">김민준</div>
-                    <div className="pd-email">minjun@example.com</div>
+                    <div className="pd-name">{userName}</div>
+                    <div className="pd-email"></div>
                   </div>
                 </div>
                 <div className="pd-divider" />
@@ -297,7 +329,7 @@ export default function HomePage() {
 
       <div className="home-body scroll">
         <div className="reveal" style={{ animationDelay: ".04s" }}>
-          <div className="greet-title">안녕하세요, 김민준님 👋</div>
+          <div className="greet-title">안녕하세요, {userName}님</div>
           <div className="greet-sub">
             현재 3개 그룹에 참여 중이에요. 오늘 진행 중인 회의가 1개 있습니다.
           </div>

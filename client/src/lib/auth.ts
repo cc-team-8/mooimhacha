@@ -26,6 +26,7 @@ export function saveSession(tokens: SessionTokens) {
 export interface UserInfo {
   id: number;
   name: string;
+  picture: string | null;
 }
 
 export function getUser(): UserInfo | null {
@@ -39,8 +40,16 @@ export function getUser(): UserInfo | null {
         .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
         .join(""),
     );
-    const payload = JSON.parse(json) as { sub: number; name: string };
-    return { id: payload.sub, name: payload.name };
+    const payload = JSON.parse(json) as {
+      sub: number;
+      name: string;
+      picture: string | null;
+    };
+    return {
+      id: payload.sub,
+      name: payload.name,
+      picture: payload.picture ?? null,
+    };
   } catch {
     return null;
   }
