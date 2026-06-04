@@ -17,7 +17,7 @@ export class ContributionController {
   async calculate(
     @Param('teamId', ParseIntPipe) teamId: number,
     @Body() dto: CalculateContributionDto,
-  ) {
+  ): Promise<unknown> {
     return this.contributionService.calculate(teamId, dto);
   }
 }

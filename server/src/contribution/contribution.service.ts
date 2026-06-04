@@ -21,7 +21,7 @@ export class ContributionService {
     this.apiUrl = this.config.get<string>('CONTRIBUTION_API_URL') ?? 'http://localhost:8000';
   }
 
-  async calculate(teamId: number, dto: CalculateContributionDto) {
+  async calculate(teamId: number, dto: CalculateContributionDto): Promise<unknown> {
     // 1. DB에서 팀 설정 조회
     const settings = await this.settingsRepo.findOne({ where: { team_id: teamId } });
     if (!settings) throw new NotFoundException('팀 설정을 찾을 수 없습니다.');
