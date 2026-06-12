@@ -27,18 +27,20 @@ const COL_COLOR = {
   완료: "var(--green)",
 };
 const COL_BADGE = { "할 일": "", "진행 중": "b-blue", 완료: "b-green" };
-const STATUS_CLS = { "할 일": "s-todo", "진행 중": "s-inprog", 완료: "s-done" };
 
 function dueState(due: string | null): {
   danger: boolean;
   warn: boolean;
   label: string;
+  timeLabel: string;
 } {
-  if (!due) return { danger: false, warn: false, label: "" };
+  if (!due) return { danger: false, warn: false, label: "", timeLabel: "" };
   const d = new Date(due);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+  const dueDay = new Date(d);
+  dueDay.setHours(0, 0, 0, 0);
+  const diff = (dueDay.getTime() - today.getTime()) / 86400000;
   const label =
     diff < 0
       ? "지남"
@@ -47,7 +49,16 @@ function dueState(due: string | null): {
         : diff === 1
           ? "내일"
           : `${d.getMonth() + 1}/${d.getDate()}`;
-  return { danger: diff <= 0, warn: diff >= 1 && diff <= 3, label };
+  const timeLabel = fmtTime(d);
+  return { danger: diff <= 0, warn: diff >= 1 && diff <= 3, label, timeLabel };
+}
+
+function fmtTime(d: Date): string {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h < 12 ? "오전" : "오후";
+  const h12 = h % 12 || 12;
+  return `${ampm} ${h12}:${String(m).padStart(2, "0")}`;
 }
 
 const DIFF_CHIPS = [
@@ -75,6 +86,7 @@ export default function TasksPage() {
   const [newDesc, setNewDesc] = useState("");
   const [newAssignee, setNewAssignee] = useState<string>("");
   const [newDue, setNewDue] = useState("");
+  const [newTime, setNewTime] = useState("");
   const [newStatus, setNewStatus] = useState<Status>("할 일");
   const [newDifficulty, setNewDifficulty] = useState(2);
 
@@ -83,6 +95,7 @@ export default function TasksPage() {
   const [editDesc, setEditDesc] = useState("");
   const [editAssignee, setEditAssignee] = useState("");
   const [editDue, setEditDue] = useState("");
+  const [editTime, setEditTime] = useState("");
   const [editStatus, setEditStatus] = useState<Status>("할 일");
   const [editDifficulty, setEditDifficulty] = useState(2);
   const [editSaving, setEditSaving] = useState(false);
@@ -168,6 +181,14 @@ export default function TasksPage() {
     setEditDesc(task.description);
     setEditAssignee(task.assignee_id ? String(task.assignee_id) : "");
     setEditDue(task.due_date?.slice(0, 10) ?? "");
+    if (!task.due_date || task.due_date.endsWith("T00:00:00.000Z")) {
+      setEditTime("");
+    } else {
+      const dt = new Date(task.due_date);
+      setEditTime(
+        `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`,
+      );
+    }
     setEditStatus(API_TO_STATUS[task.status] ?? "할 일");
     setEditDifficulty(task.difficulty ?? 2);
   }
@@ -183,7 +204,9 @@ export default function TasksPage() {
       await apiPatch(`/action-items/${editTarget.id}`, {
         description: editDesc.trim(),
         assignee_id: editAssignee ? Number(editAssignee) : undefined,
-        due_date: editDue || undefined,
+        due_date: editDue
+          ? new Date(`${editDue}T${editTime || "23:59"}`).toISOString()
+          : undefined,
         status: STATUS_TO_API[editStatus],
         difficulty: editDifficulty,
       });
@@ -246,7 +269,9 @@ export default function TasksPage() {
         team_id: team.id,
         description: newDesc.trim(),
         assignee_id: newAssignee ? Number(newAssignee) : undefined,
-        due_date: newDue || undefined,
+        due_date: newDue
+          ? new Date(`${newDue}T${newTime || "23:59"}`).toISOString()
+          : undefined,
         status: STATUS_TO_API[newStatus],
         difficulty: newDifficulty,
       });
@@ -254,6 +279,7 @@ export default function TasksPage() {
       setNewDesc("");
       setNewAssignee("");
       setNewDue("");
+      setNewTime("");
       setNewStatus("할 일");
       setNewDifficulty(2);
       showToast("태스크가 추가되었습니다");
@@ -379,6 +405,23 @@ export default function TasksPage() {
                         >
                           {t.description}
                         </div>
+                        <span className="tc-diff">
+                          {"★".repeat(t.difficulty ?? 1)}
+                          <span className="tc-diff-off">
+                            {"★".repeat(3 - (t.difficulty ?? 1))}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="tc-foot">
+                        <span className="tc-who">
+                          <span
+                            className={`av ${avOf(t.assignee_id)} av-sm`}
+                            style={{ width: 20, height: 20, fontSize: 9 }}
+                          >
+                            {who[0]}
+                          </span>
+                          {who}
+                        </span>
                         {dd.label && (
                           <div
                             className="tc-due"
@@ -392,45 +435,13 @@ export default function TasksPage() {
                           >
                             <i className="ti ti-calendar" />
                             {dd.label}
+                            {dd.timeLabel && (
+                              <span style={{ fontWeight: 500, marginLeft: 2 }}>
+                                {dd.timeLabel}
+                              </span>
+                            )}
                           </div>
                         )}
-                      </div>
-                      <div className="tc-foot">
-                        <span className="tc-who">
-                          <span
-                            className={`av ${avOf(t.assignee_id)} av-sm`}
-                            style={{ width: 20, height: 20, fontSize: 9 }}
-                          >
-                            {who[0]}
-                          </span>
-                          {who}
-                        </span>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 7,
-                          }}
-                        >
-                          <span className="tc-diff">
-                            {"★".repeat(t.difficulty ?? 1)}
-                            <span className="tc-diff-off">
-                              {"★".repeat(3 - (t.difficulty ?? 1))}
-                            </span>
-                          </span>
-                          <select
-                            className={`tc-status ${STATUS_CLS[status]}`}
-                            value={status}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              void changeStatus(t, e.target.value as Status)
-                            }
-                          >
-                            <option>할 일</option>
-                            <option>진행 중</option>
-                            <option>완료</option>
-                          </select>
-                        </div>
                       </div>
                     </div>
                   );
@@ -485,7 +496,11 @@ export default function TasksPage() {
                 <div
                   className={`lrow-due ${danger ? "due-red" : warn ? "due-amber" : "due-soft"}`}
                 >
-                  {status === "완료" ? "완료" : dd.label || "기한 없음"}
+                  {status === "완료"
+                    ? "완료"
+                    : dd.label
+                      ? `${dd.label}${dd.timeLabel ? ` ${dd.timeLabel}` : ""}`
+                      : "기한 없음"}
                 </div>
                 <span className="tc-diff">
                   {"★".repeat(t.difficulty ?? 1)}
@@ -556,12 +571,24 @@ export default function TasksPage() {
             </div>
             <div className="field">
               <label className="field-label">마감일</label>
-              <input
-                className="input"
-                type="date"
-                value={newDue}
-                onChange={(e) => setNewDue(e.target.value)}
-              />
+              <div className="field-row" style={{ gap: 6 }}>
+                <input
+                  className="input"
+                  type="date"
+                  style={{ flex: 2 }}
+                  value={newDue}
+                  onChange={(e) => setNewDue(e.target.value)}
+                />
+                <input
+                  className="input"
+                  type="time"
+                  style={{ flex: 1 }}
+                  placeholder="23:59"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                />
+              </div>
+              <div className="field-hint">시간 미입력 시 23:59</div>
             </div>
           </div>
           <div className="field">
@@ -650,12 +677,24 @@ export default function TasksPage() {
             </div>
             <div className="field">
               <label className="field-label">마감일</label>
-              <input
-                className="input"
-                type="date"
-                value={editDue}
-                onChange={(e) => setEditDue(e.target.value)}
-              />
+              <div className="field-row" style={{ gap: 6 }}>
+                <input
+                  className="input"
+                  type="date"
+                  style={{ flex: 2 }}
+                  value={editDue}
+                  onChange={(e) => setEditDue(e.target.value)}
+                />
+                <input
+                  className="input"
+                  type="time"
+                  style={{ flex: 1 }}
+                  placeholder="23:59"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                />
+              </div>
+              <div className="field-hint">시간 미입력 시 23:59</div>
             </div>
           </div>
           <div className="field">
