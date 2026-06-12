@@ -27,7 +27,7 @@ export default function Modal({
             ×
           </button>
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
         <div className="modal-actions">{actions}</div>
       </div>
     </div>

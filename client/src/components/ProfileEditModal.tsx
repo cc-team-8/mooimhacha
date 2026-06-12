@@ -96,15 +96,37 @@ export default function ProfileEditModal({
           </>
         }
       >
-        <div className="field">
-          <div className="field-label">이름</div>
-          <input
-            className="input"
-            value={user?.name ?? ""}
-            disabled
-            title="이름은 카카오 계정 정보를 따릅니다"
-          />
+        {/* 프로필 헤더 */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 13,
+            padding: "12px 14px",
+            background: "var(--surface-2)",
+            borderRadius: 14,
+            marginBottom: 18,
+          }}
+        >
+          <div className="av a1 av-lg" style={{ flexShrink: 0 }}>
+            {user?.name?.[0] ?? "?"}
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>
+              {user?.name ?? "—"}
+            </div>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--text-soft)",
+                marginTop: 2,
+              }}
+            >
+              카카오 계정으로 로그인됨
+            </div>
+          </div>
         </div>
+
         <div className="field">
           <div className="field-label">
             대학교 <span className="opt">선택</span>
@@ -117,7 +139,7 @@ export default function ProfileEditModal({
             maxLength={100}
           />
         </div>
-        <div className="field">
+        <div className="field" style={{ marginBottom: 0 }}>
           <div className="field-label">
             학과 <span className="opt">선택</span>
           </div>
@@ -129,22 +151,14 @@ export default function ProfileEditModal({
             maxLength={100}
           />
         </div>
-        <div
-          style={{
-            marginTop: 16,
-            paddingTop: 12,
-            borderTop: "1px solid var(--border)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <span className="field-hint" style={{ margin: 0 }}>
-            탈퇴 시 개인정보는 즉시 익명화됩니다.
+
+        <div className="danger-zone">
+          <span className="danger-zone-text">
+            탈퇴 시 개인정보가 즉시 익명화됩니다.
           </span>
           <button
             className="btn btn-sm btn-danger"
+            style={{ flexShrink: 0 }}
             onClick={() => setConfirmingDelete(true)}
           >
             회원 탈퇴
