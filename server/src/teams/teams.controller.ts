@@ -18,6 +18,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { JoinTeamDto } from './dto/join-team.dto';
 import { UpdateTeamSettingsDto } from './dto/update-team-settings.dto';
+import { TransferLeaderDto } from './dto/transfer-leader.dto';
 
 @ApiTags('팀')
 @Controller('teams')
@@ -84,6 +85,26 @@ export class TeamsController {
     @Request() req: { user: { id: number } },
   ) {
     return this.teamsService.deleteTeam(id, req.user.id);
+  }
+
+  @Patch(':id/leader')
+  @ApiOperation({ summary: '팀장 위임 (팀장만)' })
+  transferLeader(
+    @Param('id', ParseIntPipe) teamId: number,
+    @Request() req: { user: { id: number } },
+    @Body() dto: TransferLeaderDto,
+  ) {
+    return this.teamsService.transferLeader(req.user.id, teamId, dto.user_id);
+  }
+
+  // 주의: ':id/members/:userId'보다 먼저 선언해야 'me'가 숫자 파라미터로 매칭되지 않음
+  @Delete(':id/members/me')
+  @ApiOperation({ summary: '팀 탈퇴 (본인) — 팀장은 위임 후 가능' })
+  leave(
+    @Param('id', ParseIntPipe) teamId: number,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.teamsService.leave(req.user.id, teamId);
   }
 
   @Delete(':id/members/:userId')

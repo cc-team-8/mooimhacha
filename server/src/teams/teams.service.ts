@@ -181,15 +181,27 @@ export class TeamsService {
       where: { team_id: teamId, deleted_at: IsNull() },
     });
 
+    // 클라이언트(설정 페이지 멤버 관리)가 이름·아바타를 쓰므로 사용자 정보를 합쳐 반환
+    const users = await this.dataSource.getRepository(User).find({
+      where: { id: In(memberships.map((m) => Number(m.user_id))) },
+      select: { id: true, name: true, profile_image_url: true },
+    });
+    const userById = new Map(users.map((u) => [Number(u.id), u]));
+
     return {
       id: Number(team.id),
       name: team.name,
       course_name: team.course_name,
       invite_code: team.invite_code,
-      members: memberships.map((m) => ({
-        user_id: Number(m.user_id),
-        role: m.role,
-      })),
+      members: memberships.map((m) => {
+        const u = userById.get(Number(m.user_id));
+        return {
+          user_id: Number(m.user_id),
+          name: u?.name ?? '알 수 없음',
+          profile_image_url: u?.profile_image_url ?? null,
+          role: m.role,
+        };
+      }),
     };
   }
 
@@ -373,5 +385,51 @@ export class TeamsService {
     return Array.from(bytes)
       .map((b) => chars[b % 36])
       .join('');
+  }
+
+  // 팀 탈퇴 (본인) — 팀장은 위임 후에만 가능, 마지막 1인이 나가면 팀도 정리
+  async leave(userId: number, teamId: number) {
+    const membership = await this.requireMembership(userId, teamId);
+    const activeCount = await this.membershipRepo.count({
+      where: { team_id: teamId, deleted_at: IsNull() },
+    });
+    if (membership.role === 'leader' && activeCount > 1) {
+      throw new ConflictException('팀장을 넘긴 뒤 나갈 수 있어요.');
+    }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.softRemove(membership);
+      // 마지막 1인이 나가면 팀도 정리 (회의·기여도 데이터는 보존)
+      if (activeCount === 1) {
+        const team = await manager.findOne(Team, { where: { id: teamId } });
+        if (team) await manager.softRemove(team);
+      }
+    });
+    return { left: true };
+  }
+
+  // 팀장 위임 (팀장만)
+  async transferLeader(userId: number, teamId: number, targetUserId: number) {
+    const me = await this.requireLeader(userId, teamId);
+    if (targetUserId === userId) {
+      throw new BadRequestException('이미 팀장이에요.');
+    }
+    const target = await this.membershipRepo.findOne({
+      where: {
+        team_id: teamId,
+        user_id: targetUserId,
+        deleted_at: IsNull(),
+      },
+    });
+    if (!target)
+      throw new NotFoundException('해당 사용자는 팀 멤버가 아닙니다.');
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(TeamMembership, { id: me.id }, { role: 'member' });
+      await manager.update(
+        TeamMembership,
+        { id: target.id },
+        { role: 'leader' },
+      );
+    });
+    return this.getTeam(teamId, userId);
   }
 }
