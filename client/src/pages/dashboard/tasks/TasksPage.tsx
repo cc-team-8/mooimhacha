@@ -260,10 +260,27 @@ export default function TasksPage() {
                       className={`tcard ${danger ? "danger" : ""} ${warn ? "warn" : ""} ${status === "완료" ? "done-card" : ""}`}
                       style={stripeStyle(t.assignee_id, danger, warn)}
                     >
-                      <div
-                        className={`tc-title ${status === "완료" ? "done" : ""}`}
-                      >
-                        {t.description}
+                      <div className="tc-head">
+                        <div
+                          className={`tc-title ${status === "완료" ? "done" : ""}`}
+                        >
+                          {t.description}
+                        </div>
+                        {dd.label && (
+                          <div
+                            className="tc-due"
+                            style={{
+                              color: danger
+                                ? "var(--coral)"
+                                : warn
+                                  ? "var(--amber)"
+                                  : "var(--text-soft)",
+                            }}
+                          >
+                            <i className="ti ti-calendar" />
+                            {dd.label}
+                          </div>
+                        )}
                       </div>
                       <div className="tc-foot">
                         <span className="tc-who">
@@ -339,7 +356,9 @@ export default function TasksPage() {
             );
           })}
           {tasks.length === 0 && (
-            <div style={{ padding: 18, fontSize: 13, color: "var(--text-soft)" }}>
+            <div
+              style={{ padding: 18, fontSize: 13, color: "var(--text-soft)" }}
+            >
               등록된 태스크가 없습니다. 태스크를 추가해 보세요.
             </div>
           )}
