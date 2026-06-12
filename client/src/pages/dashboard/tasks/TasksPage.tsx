@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import type { ActionItem, TeamContribution } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
 
@@ -76,7 +77,9 @@ const STATUS_CHIP_CLS: Record<Status, string> = {
 export default function TasksPage() {
   const { showToast } = useToast();
   const team = useOutletContext<TeamContext | null>();
+  const currentUser = getUser();
   const [view, setView] = useState<"board" | "list">("board");
+  const [filter, setFilter] = useState<"all" | "mine">("all");
   const [tasks, setTasks] = useState<ActionItem[]>([]);
   const [members, setMembers] = useState<TeamContribution[]>([]);
 
@@ -165,6 +168,10 @@ export default function TasksPage() {
     else if (b.due_date) return 1;
     return (b.difficulty ?? 1) - (a.difficulty ?? 1);
   });
+  const filteredTasks =
+    filter === "mine"
+      ? sortedTasks.filter((t) => t.assignee_id === currentUser?.id)
+      : sortedTasks;
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -294,19 +301,35 @@ export default function TasksPage() {
   return (
     <div>
       <div className="task-top">
-        <div className="view-toggle">
-          <button
-            className={`vt ${view === "board" ? "active" : ""}`}
-            onClick={() => setView("board")}
-          >
-            <i className="ti ti-layout-columns" /> 보드
-          </button>
-          <button
-            className={`vt ${view === "list" ? "active" : ""}`}
-            onClick={() => setView("list")}
-          >
-            <i className="ti ti-list" /> 목록
-          </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="view-toggle">
+            <button
+              className={`vt ${view === "board" ? "active" : ""}`}
+              onClick={() => setView("board")}
+            >
+              <i className="ti ti-layout-columns" /> 보드
+            </button>
+            <button
+              className={`vt ${view === "list" ? "active" : ""}`}
+              onClick={() => setView("list")}
+            >
+              <i className="ti ti-list" /> 목록
+            </button>
+          </div>
+          <div className="view-toggle">
+            <button
+              className={`vt ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
+            >
+              전체
+            </button>
+            <button
+              className={`vt ${filter === "mine" ? "active" : ""}`}
+              onClick={() => setFilter("mine")}
+            >
+              내 태스크
+            </button>
+          </div>
         </div>
         <button
           className="btn btn-primary btn-sm"
@@ -333,7 +356,7 @@ export default function TasksPage() {
       {view === "board" && (
         <div className="board">
           {STATUS_COLS.map((col) => {
-            const colTasks = sortedTasks.filter(
+            const colTasks = filteredTasks.filter(
               (t) => API_TO_STATUS[t.status] === col,
             );
             return (
@@ -458,7 +481,7 @@ export default function TasksPage() {
       {/* 목록 뷰 */}
       {view === "list" && (
         <div>
-          {sortedTasks.map((t) => {
+          {filteredTasks.map((t) => {
             const status = API_TO_STATUS[t.status];
             const dd = dueState(t.due_date);
             const danger = status !== "완료" && dd.danger;
@@ -509,11 +532,13 @@ export default function TasksPage() {
               </div>
             );
           })}
-          {tasks.length === 0 && (
+          {filteredTasks.length === 0 && (
             <div
               style={{ padding: 18, fontSize: 13, color: "var(--text-soft)" }}
             >
-              등록된 태스크가 없습니다. 태스크를 추가해 보세요.
+              {filter === "mine"
+                ? "나에게 배정된 태스크가 없습니다."
+                : "등록된 태스크가 없습니다. 태스크를 추가해 보세요."}
             </div>
           )}
         </div>
