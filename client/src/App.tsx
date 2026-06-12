@@ -4,6 +4,17 @@ import AuthCallback from "@/pages/login/AuthCallback";
 import OnboardingPage from "@/pages/onboarding/OnboardingPage";
 import HomePage from "@/pages/home/HomePage";
 import DashboardPage from "@/pages/dashboard/DashboardPage";
+import { useToast } from "@/hooks/useToast";
+
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem("access_token");
+  const { showToast } = useToast();
+  if (!token) {
+    showToast("로그인이 필요합니다.");
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
 
 export default function App() {
   return (
@@ -11,9 +22,30 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/dashboard/*" element={<DashboardPage />} />
+        <Route
+          path="/onboarding"
+          element={
+            <PrivateRoute>
+              <OnboardingPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            <PrivateRoute>
+              <HomePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:teamId/*"
+          element={
+            <PrivateRoute>
+              <DashboardPage />
+            </PrivateRoute>
+          }
+        />
         {/* 정의되지 않은 경로는 로그인으로 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

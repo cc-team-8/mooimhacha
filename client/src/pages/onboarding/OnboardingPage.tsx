@@ -1,35 +1,73 @@
 import "@/styles/onboarding.css";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
-
-// 컴포넌트 외부에 선언: useState 초기값 함수로 전달되어 최초 렌더에만 실행됨.
-// 안에 선언하면 리렌더마다 함수 참조가 재생성되어 불필요한 오버헤드 발생.
-function genCode() {
-  const c = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let s = "";
-  for (let i = 0; i < 3; i++) s += c[Math.floor(Math.random() * c.length)];
-  return s + "-" + Math.floor(100 + Math.random() * 900);
-}
+import { apiFetch, authHeader } from "@/lib/apiFetch";
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [step, setStep] = useState(0);
-  // useState(genCode): 함수 레퍼런스를 전달해 초기 렌더에만 실행.
-  // useState(genCode()): 호출하면 렌더마다 실행되어 코드가 바뀜.
-  const [code] = useState(genCode);
+  const [teamId, setTeamId] = useState(0);
+  const [teamName, setTeamName] = useState("");
   const [selectedChip, setSelectedChip] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const expDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return `${d.getMonth() + 1}월 ${d.getDate()}일까지 유효`;
-  })();
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = inviteCode;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    showToast("초대코드가 복사됐습니다");
+    setTimeout(() => setCopied(false), 2000);
+  }
 
-  function copyCode() {
-    navigator.clipboard?.writeText(code).catch(() => {});
-    showToast(`초대코드 ${code} 복사됨`);
+  async function createTeam() {
+    if (!teamName.trim()) {
+      showToast("그룹 이름을 입력해주세요");
+      return;
+    }
+    setIsCreating(true);
+    try {
+      type CreateTeamResponse = {
+        id: number;
+        name: string;
+        course_name: string;
+        invite_code: string;
+        created_by: number;
+      };
+
+      const data = await apiFetch<CreateTeamResponse>("/api/teams", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({
+          name: teamName.trim(),
+          course_name: selectedChip || "기타",
+        }),
+      });
+
+      setInviteCode(data.invite_code);
+      setTeamId(data.id);
+      console.log(data);
+      
+      setStep(1);
+    } catch (err) {
+      showToast((err as Error).message || "팀 생성 실패");
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   const chips = ["캡스톤 설계", "전공 팀플", "교양", "스터디"];
@@ -90,7 +128,9 @@ export default function OnboardingPage() {
                 <input
                   className="input"
                   placeholder="예) 캡스톤 팀플 B"
-                  maxLength={30}
+                  maxLength={100}
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
                 />
                 <div className="field-hint">한글·영문·숫자 포함 최대 30자</div>
               </div>
@@ -132,9 +172,16 @@ export default function OnboardingPage() {
             <div className="ob-foot">
               <button
                 className="btn btn-primary btn-full"
-                onClick={() => setStep(1)}
+                onClick={createTeam}
+                disabled={isCreating}
               >
-                팀원 초대 <i className="ti ti-arrow-right" />
+                {isCreating ? (
+                  "생성 중..."
+                ) : (
+                  <>
+                    팀원 초대 <i className="ti ti-arrow-right" />
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -156,13 +203,19 @@ export default function OnboardingPage() {
                   <div className="code-label">
                     <i className="ti ti-key" /> 우리 팀 초대코드
                   </div>
-                  <div className="code-val">{code}</div>
-                  <div className="code-exp">
-                    <i className="ti ti-clock" /> {expDate}
-                  </div>
+                  <div className="code-val">{inviteCode}</div>
                 </div>
-                <button className="copy-btn" onClick={copyCode}>
-                  <i className="ti ti-copy" /> 복사
+                <button
+                  className="copy-btn"
+                  onClick={copyCode}
+                  style={
+                    copied
+                      ? { background: "rgba(255,255,255,0.35)" }
+                      : undefined
+                  }
+                >
+                  <i className={copied ? "ti ti-check" : "ti ti-copy"} />
+                  {copied ? "복사됨" : "복사"}
                 </button>
               </div>
               <div
@@ -193,18 +246,9 @@ export default function OnboardingPage() {
             </div>
             <div className="ob-top" style={{ textAlign: "center" }}>
               <div className="ob-team-avs">
-                {[
-                  ["a1", "김"],
-                  ["a2", "이"],
-                  ["a3", "박"],
-                  ["a4", "최"],
-                ].map(([cls, name]) => (
-                  <div key={name} className={`av ${cls} av-lg`}>
-                    {name}
-                  </div>
-                ))}
+                <div className="av a1 av-lg">{teamName[0]}</div>
               </div>
-              <div className="ob-title">캡스톤 팀플 B · 4명</div>
+              <div className="ob-title">{teamName} · 1명</div>
               <div className="ob-sub">
                 그룹이 만들어졌어요. 회의를 시작하고 기여도를 기록해보세요.
               </div>
@@ -215,19 +259,13 @@ export default function OnboardingPage() {
                   <div className="ob-sg-l">
                     <i className="ti ti-users" /> 팀원
                   </div>
-                  <div className="ob-sg-v">4명</div>
+                  <div className="ob-sg-v">1명</div>
                 </div>
                 <div className="ob-sg">
                   <div className="ob-sg-l">
                     <i className="ti ti-key" /> 초대코드
                   </div>
-                  <div className="ob-sg-v">{code}</div>
-                </div>
-                <div className="ob-sg">
-                  <div className="ob-sg-l">
-                    <i className="ti ti-calendar" /> 마감일
-                  </div>
-                  <div className="ob-sg-v">6월 14일</div>
+                  <div className="ob-sg-v">{inviteCode}</div>
                 </div>
                 <div className="ob-sg">
                   <div className="ob-sg-l">
@@ -277,7 +315,7 @@ export default function OnboardingPage() {
             <div className="ob-foot">
               <button
                 className="btn btn-primary btn-full"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate(`/dashboard/${teamId}`)}
               >
                 <i className="ti ti-rocket" /> 대시보드로 이동
               </button>

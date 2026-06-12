@@ -48,6 +48,8 @@ export class AuthService {
     const profileImageUrl =
       kakaoUser.kakao_account?.profile?.profile_image_url ?? null;
 
+    console.log('name:', name, '| hex:', Buffer.from(name).toString('hex'));
+
     let user = await this.userRepo.findOne({ where: { kakao_id: kakaoId } });
     const isNewUser = !user;
 
@@ -62,7 +64,7 @@ export class AuthService {
     }
 
     return {
-      ...this.issueTokens(user.id),
+      ...this.issueTokens(user),
       user: {
         id: user.id,
         name: user.name,
@@ -99,7 +101,7 @@ export class AuthService {
     };
   }
 
-  refresh(refreshToken: string) {
+  async refresh(refreshToken: string) {
     let payload: { sub: number; type: string };
     try {
       payload = this.jwtService.verify(refreshToken, {
@@ -113,18 +115,20 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 refresh_token입니다.');
     }
 
-    const { access_token } = this.issueTokens(payload.sub);
+    const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+    if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    const { access_token } = this.issueTokens(user);
     return { access_token };
   }
 
-  private issueTokens(userId: number) {
+  private issueTokens(user: Pick<User, 'id' | 'name' | 'profile_image_url'>) {
     const secret = this.config.get<string>('JWT_SECRET');
     const access_token = this.jwtService.sign(
-      { sub: userId },
+      { sub: user.id, name: user.name, picture: user.profile_image_url },
       { secret, expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '7d' },
     );
     const refresh_token = this.jwtService.sign(
-      { sub: userId, type: 'refresh' },
+      { sub: user.id, type: 'refresh' },
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       { secret, expiresIn: '30d' as any },
     );

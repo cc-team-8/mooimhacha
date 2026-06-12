@@ -1,44 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
+import { getUser, clearSession } from "@/lib/auth";
+import { apiFetch, authHeader } from "@/lib/apiFetch";
 import Card from "@/components/Card";
 import "@/styles/home.css";
 
-const GROUPS = [
-  {
-    name: "캡스톤 설계 팀 A",
-    badge: "캡스톤",
-    badgeCls: "b-green",
-    color: "var(--green)",
-    members: ["김", "이", "박", "최"],
-    contrib: 38,
-    deadline: "5월 14일 마감",
-    status: "진행 중",
-    statusCls: "b-green",
-  },
-  {
-    name: "마케팅원론 조별과제",
-    badge: "전공",
-    badgeCls: "b-blue",
-    color: "var(--blue)",
-    members: ["김", "정", "윤"],
-    contrib: 52,
-    deadline: "5월 20일 마감",
-    status: "진행 중",
-    statusCls: "b-blue",
-  },
-  {
-    name: "알고리즘 스터디",
-    badge: "스터디",
-    badgeCls: "b-gray",
-    color: "var(--text-soft)",
-    members: ["김", "이", "한", "강"],
-    contrib: 29,
-    deadline: "상시",
-    status: "활동 중",
-    statusCls: "b-gray",
-  },
-];
+interface Team {
+  id: number;
+  name: string;
+  course_name: string;
+  my_role: "leader" | "member";
+  member_count: number;
+  members: string[];
+}
 
 const TASKS = [
   {
@@ -138,12 +113,26 @@ const MEETINGS = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const user = getUser();
+  const userName = user?.name ?? "사용자";
+  const userInitial = userName[0];
+  const [teams, setTeams] = useState<Team[]>([]);
   const [tasks, setTasks] = useState(TASKS);
   const [joinCode, setJoinCode] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [notiOpen, setNotiOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notiRef = useRef<HTMLDivElement>(null);
+
+  const fetchTeams = () => {
+    apiFetch<{ teams: Team[] }>("/api/teams", { headers: authHeader() })
+      .then((data) => setTeams(data.teams))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -157,21 +146,31 @@ export default function HomePage() {
   }, []);
 
   function fmtCode(v: string) {
-    v = v
-      .replace(/[^A-Za-z0-9]/g, "")
-      .toUpperCase()
-      .slice(0, 6);
-    if (v.length > 3) v = v.slice(0, 3) + "-" + v.slice(3);
-    setJoinCode(v);
+    setJoinCode(
+      v
+        .replace(/[^A-Za-z0-9]/g, "")
+        .toUpperCase()
+        .slice(0, 8),
+    );
   }
 
-  function joinGroup() {
-    if (joinCode.length < 5) {
-      showToast("올바른 초대코드를 입력해주세요");
+  async function joinGroup() {
+    if (joinCode.length !== 8) {
+      showToast("초대코드 8자리를 입력해주세요");
       return;
     }
-    showToast(`${joinCode} 그룹 참가 요청 완료`);
-    setJoinCode("");
+    try {
+      const data = await apiFetch<{ name: string }>("/api/teams/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ invite_code: joinCode }),
+      });
+      showToast(`${data.name} 참가 완료`);
+      setJoinCode("");
+      fetchTeams();
+    } catch (err) {
+      showToast((err as Error).message || "참가 요청 실패");
+    }
   }
 
   function completeTask(idx: number) {
@@ -264,18 +263,46 @@ export default function HomePage() {
           <div className="profile-wrap" ref={profileRef}>
             <div
               className="av a1 av-md"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", overflow: "hidden" }}
               onClick={() => setProfileOpen((v) => !v)}
             >
-              김
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={userName}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                userInitial
+              )}
             </div>
             {profileOpen && (
               <div className="profile-dropdown">
                 <div className="pd-header">
-                  <div className="av a1 av-md">김</div>
+                  <div className="av a1 av-md" style={{ overflow: "hidden" }}>
+                    {user?.picture ? (
+                      <img
+                        src={user.picture}
+                        alt={userName}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      userInitial
+                    )}
+                  </div>
                   <div className="pd-info">
-                    <div className="pd-name">김민준</div>
-                    <div className="pd-email">minjun@example.com</div>
+                    <div className="pd-name">{userName}</div>
+                    <div className="pd-email"></div>
                   </div>
                 </div>
                 <div className="pd-divider" />
@@ -286,7 +313,13 @@ export default function HomePage() {
                   <i className="ti ti-settings" /> 설정
                 </div>
                 <div className="pd-divider" />
-                <div className="pd-item danger" onClick={() => navigate("/")}>
+                <div
+                  className="pd-item danger"
+                  onClick={() => {
+                    clearSession();
+                    navigate("/");
+                  }}
+                >
                   <i className="ti ti-logout" /> 로그아웃
                 </div>
               </div>
@@ -297,9 +330,9 @@ export default function HomePage() {
 
       <div className="home-body scroll">
         <div className="reveal" style={{ animationDelay: ".04s" }}>
-          <div className="greet-title">안녕하세요, 김민준님 👋</div>
+          <div className="greet-title">안녕하세요, {userName}님</div>
           <div className="greet-sub">
-            현재 3개 그룹에 참여 중이에요. 오늘 진행 중인 회의가 1개 있습니다.
+            현재 {teams.length}개 그룹에 참여 중이에요.
           </div>
         </div>
 
@@ -310,47 +343,56 @@ export default function HomePage() {
               <div className="sec-title">
                 <i className="ti ti-users-group" /> 내 그룹
               </div>
-              <span className="sec-count">3개 참여 중</span>
+              <span className="sec-count">{teams.length}개 참여 중</span>
             </div>
             <div className="groups-grid">
-              {GROUPS.map((g) => (
-                <div
-                  key={g.name}
-                  className="group-card"
-                  onClick={() => navigate("/dashboard")}
-                >
-                  <div className="gc-stripe" style={{ background: g.color }} />
-                  <div className="gc-top">
-                    <div className="gc-name">{g.name}</div>
-                    <span className={`badge ${g.badgeCls}`}>{g.badge}</span>
+              {teams.map((team) => {
+                const isLeader = team.my_role === "leader";
+                const color = isLeader ? "var(--green)" : "var(--blue)";
+                const badgeCls = isLeader ? "b-green" : "b-blue";
+                return (
+                  <div
+                    key={team.id}
+                    className="group-card"
+                    onClick={() => navigate(`/dashboard/${team.id}`)}
+                  >
+                    <div className="gc-stripe" style={{ background: color }} />
+                    <div className="gc-top">
+                      <div className="gc-name">{team.name}</div>
+                      <span className={`badge ${badgeCls}`}>
+                        {team.course_name}
+                      </span>
+                    </div>
+                    <div className="gc-avs">
+                      {team.members.slice(0, 4).map((name, i) => (
+                        <div key={i} className={`av a${(i % 4) + 1} av-sm`}>
+                          {name[0]}
+                        </div>
+                      ))}
+                      <span className="gc-more">{team.member_count}명</span>
+                    </div>
+                    <div className="gc-contrib-row">
+                      <span className="lbl">내 기여도</span>
+                      <span
+                        className="val"
+                        style={{ color: "var(--text-soft)" }}
+                      >
+                        -%
+                      </span>
+                    </div>
+                    <div className="gc-bar">
+                      <i
+                        style={{ width: "0%", background: "var(--border-2)" }}
+                      />
+                    </div>
+                    <div className="gc-foot">
+                      <span className={`badge ${badgeCls}`}>
+                        {isLeader ? "팀장" : "팀원"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="gc-avs">
-                    {g.members.map((m, i) => (
-                      <div key={i} className={`av a${(i % 4) + 1} av-sm`}>
-                        {m}
-                      </div>
-                    ))}
-                    <span className="gc-more">{g.members.length}명</span>
-                  </div>
-                  <div className="gc-contrib-row">
-                    <span className="lbl">내 기여도</span>
-                    <span className="val" style={{ color: g.color }}>
-                      {g.contrib}%
-                    </span>
-                  </div>
-                  <div className="gc-bar">
-                    <i
-                      style={{ width: `${g.contrib}%`, background: g.color }}
-                    />
-                  </div>
-                  <div className="gc-foot">
-                    <span className="gc-deadline">
-                      <i className="ti ti-clock" /> {g.deadline}
-                    </span>
-                    <span className={`badge ${g.statusCls}`}>{g.status}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div
                 className="new-group"
                 onClick={() => navigate("/onboarding")}
@@ -369,8 +411,8 @@ export default function HomePage() {
               <div className="join-row">
                 <input
                   className="join-input"
-                  placeholder="ABC-123"
-                  maxLength={7}
+                  placeholder="ABCD1234"
+                  maxLength={8}
                   value={joinCode}
                   onChange={(e) => fmtCode(e.target.value)}
                 />

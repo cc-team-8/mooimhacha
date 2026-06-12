@@ -1,40 +1,20 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import Card from "@/components/Card";
+import type { TeamContext } from "../DashboardPage";
 
-const CONTRIB = [
-  {
-    name: "김민준",
-    pct: 38,
-    color: "var(--green)",
-    task: "3/3 완료",
-    taskColor: "var(--green)",
-  },
-  {
-    name: "이서연",
-    pct: 31,
-    color: "var(--blue)",
-    task: "2/3 완료",
-    taskColor: undefined,
-  },
-  {
-    name: "최유나",
-    pct: 23,
-    color: "var(--pink)",
-    task: "2/3 완료",
-    taskColor: undefined,
-  },
-  {
-    name: "박지호",
-    pct: 8,
-    color: "var(--coral)",
-    task: "0/2 완료",
-    taskColor: "var(--coral)",
-  },
+const MEMBER_COLORS = [
+  "var(--green)",
+  "var(--blue)",
+  "var(--pink)",
+  "var(--amber)",
+  "var(--coral)",
+  "var(--text-soft)",
 ];
 
 export default function OverviewPage() {
   const navigate = useNavigate();
+  const team = useOutletContext<TeamContext | null>();
 
   // requestAnimationFrame으로 지연 적용: 마운트 직후 0% → data-w% 로 CSS transition 애니메이션.
   // 동기 적용하면 브라우저가 초기값과 최종값을 합쳐 렌더링해 transition이 발동하지 않음.
@@ -99,23 +79,22 @@ export default function OverviewPage() {
           extra={<span className="badge b-green">실시간</span>}
         >
           <div style={{ padding: "2px 18px 14px" }}>
-            {CONTRIB.map((c) => (
-              <div key={c.name} className="contrib-row">
-                <span className="c-name">{c.name}</span>
+            {(team?.members ?? []).map((name, i) => (
+              <div key={i} className="contrib-row">
+                <span className="c-name">{name}</span>
                 <span className="c-bar">
-                  <i data-w={c.pct} style={{ background: c.color }} />
+                  <i
+                    style={{
+                      width: 0,
+                      background: MEMBER_COLORS[i % MEMBER_COLORS.length],
+                    }}
+                  />
                 </span>
-                <span
-                  className="c-pct"
-                  style={c.pct === 8 ? { color: c.color } : undefined}
-                >
-                  {c.pct}%
+                <span className="c-pct" style={{ color: "var(--text-soft)" }}>
+                  -%
                 </span>
-                <span
-                  className="c-task"
-                  style={c.taskColor ? { color: c.taskColor } : undefined}
-                >
-                  {c.task}
+                <span className="c-task" style={{ color: "var(--text-soft)" }}>
+                  -
                 </span>
               </div>
             ))}

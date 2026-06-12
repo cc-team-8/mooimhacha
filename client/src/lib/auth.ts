@@ -22,3 +22,40 @@ export function saveSession(tokens: SessionTokens) {
   localStorage.setItem("access_token", tokens.access_token);
   localStorage.setItem("refresh_token", tokens.refresh_token);
 }
+
+export function clearSession() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+}
+
+export interface UserInfo {
+  id: number;
+  name: string;
+  picture: string | null;
+}
+
+export function getUser(): UserInfo | null {
+  const token = localStorage.getItem("access_token");
+  if (!token) return null;
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join(""),
+    );
+    const payload = JSON.parse(json) as {
+      sub: number;
+      name: string;
+      picture: string | null;
+    };
+    return {
+      id: payload.sub,
+      name: payload.name,
+      picture: payload.picture ?? null,
+    };
+  } catch {
+    return null;
+  }
+}

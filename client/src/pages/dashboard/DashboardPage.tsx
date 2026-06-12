@@ -4,43 +4,42 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
   useNavigate,
   useLocation,
+  useParams,
 } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { getUser } from "@/lib/auth";
+import { apiFetch, authHeader } from "@/lib/apiFetch";
 import OverviewPage from "./overview/OverviewPage";
 import MeetingPage from "./meeting/MeetingPage";
 import TasksPage from "./tasks/TasksPage";
 import ReportPage from "./report/ReportPage";
+import SettingsPage from "./settings/SettingsPage";
 import "@/styles/dashboard.css";
 
-const NAV = [
-  {
-    key: "overview",
-    path: "/dashboard/overview",
-    icon: "ti-layout-dashboard",
-    label: "대시보드",
-  },
+export interface TeamContext {
+  id: number;
+  name: string;
+  course_name: string;
+  my_role: "leader" | "member";
+  member_count: number;
+  members: string[];
+}
+
+const NAV_ITEMS = [
+  { key: "overview", icon: "ti-layout-dashboard", label: "대시보드" },
   {
     key: "meeting",
-    path: "/dashboard/meeting",
     icon: "ti-video",
     label: "회의 관리",
     badge: "LIVE",
     badgeLive: true,
   },
-  {
-    key: "tasks",
-    path: "/dashboard/tasks",
-    icon: "ti-checklist",
-    label: "태스크",
-    badge: "7",
-  },
-  {
-    key: "report",
-    path: "/dashboard/report",
-    icon: "ti-chart-bar",
-    label: "기여도 리포트",
-  },
+  { key: "tasks", icon: "ti-checklist", label: "태스크", badge: "7" },
+  { key: "report", icon: "ti-chart-bar", label: "기여도 리포트" },
+  { key: "settings", icon: "ti-settings", label: "팀 설정" },
 ];
 
 // NAV의 label과 별도로 관리: 헤더 타이틀은 아이콘·badge 없이 문자열만 필요하기 때문
@@ -49,13 +48,26 @@ const TITLE: Record<string, string> = {
   meeting: "회의 관리",
   tasks: "태스크",
   report: "기여도 리포트",
+  settings: "팀 설정",
 };
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  // "/dashboard/overview" → ["", "dashboard", "overview"] → index 2
-  const current = pathname.split("/")[2] || "overview";
+  const { teamId } = useParams<{ teamId: string }>();
+  const current = pathname.split("/")[3] || "overview";
+  const currentUser = getUser();
+  const [team, setTeam] = useState<TeamContext | null>(null);
+
+  useEffect(() => {
+    if (!teamId) return;
+    apiFetch<{ teams: TeamContext[] }>("/api/teams", { headers: authHeader() })
+      .then((data) => {
+        const found = data.teams.find((t) => t.id === Number(teamId));
+        if (found) setTeam(found);
+      })
+      .catch(() => {});
+  }, [teamId]);
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>
@@ -66,19 +78,21 @@ export default function DashboardPage() {
         </button>
 
         <div className="sb-team">
-          <div className="sb-team-badge">A</div>
+          <div className="sb-team-badge">{team?.name[0] ?? "?"}</div>
           <div>
-            <div className="sb-team-name">캡스톤 설계 팀 A</div>
-            <div className="sb-team-sub">팀원 4명 · 진행 중</div>
+            <div className="sb-team-name">{team?.name ?? "팀 선택 안됨"}</div>
+            <div className="sb-team-sub">
+              팀원 {team?.member_count ?? "-"}명
+            </div>
           </div>
         </div>
 
         <div className="sb-sec">메뉴</div>
-        {NAV.map((n) => (
+        {NAV_ITEMS.map((n) => (
           <div
             key={n.key}
             className={`nav-item ${current === n.key ? "active" : ""}`}
-            onClick={() => navigate(n.path)}
+            onClick={() => navigate(`/dashboard/${teamId}/${n.key}`)}
           >
             <i className={`ti ${n.icon}`} />
             {n.label}
@@ -92,26 +106,23 @@ export default function DashboardPage() {
 
         <div className="sb-members">
           <div className="sb-sec">팀원</div>
-          {[
-            { av: "a1", name: "김민준", me: true },
-            { av: "a2", name: "이서연" },
-            { av: "a3", name: "박지호" },
-            { av: "a4", name: "최유나" },
-          ].map((m) => (
-            <div key={m.name} className="sb-mrow">
-              <div className={`av ${m.av} av-sm`}>{m.name[0]}</div>
-              {m.name}
-              {m.me && <span className="me-tag">나</span>}
+          {(team?.members ?? []).map((name, i) => (
+            <div key={i} className="sb-mrow">
+              <div className={`av a${(i % 4) + 1} av-sm`}>{name[0]}</div>
+              {name}
+              {name === currentUser?.name && <span className="me-tag">나</span>}
             </div>
           ))}
         </div>
 
         <div className="sb-spacer" />
         <div className="sb-user">
-          <div className="av a1 av-md">김</div>
+          <div className="av a1 av-md">{currentUser?.name[0] ?? "?"}</div>
           <div>
-            <div className="sb-user-name">김민준</div>
-            <div className="sb-user-role">팀장 · 소프트웨어학과</div>
+            <div className="sb-user-name">{currentUser?.name ?? ""}</div>
+            <div className="sb-user-role">
+              {team?.my_role === "leader" ? "팀장" : "팀원"}
+            </div>
           </div>
         </div>
       </aside>
@@ -123,11 +134,14 @@ export default function DashboardPage() {
         </div>
         <div className="main-content scroll">
           <Routes>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<OverviewPage />} />
-            <Route path="meeting" element={<MeetingPage />} />
-            <Route path="tasks" element={<TasksPage />} />
-            <Route path="report" element={<ReportPage />} />
+            <Route element={<Outlet context={team} />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<OverviewPage />} />
+              <Route path="meeting" element={<MeetingPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+              <Route path="report" element={<ReportPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
           </Routes>
         </div>
       </div>

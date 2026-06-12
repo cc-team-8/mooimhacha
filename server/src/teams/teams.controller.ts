@@ -76,6 +76,16 @@ export class TeamsController {
     return this.teamsService.regenerateInviteCode(id, req.user.id);
   }
 
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({ summary: '팀 삭제 (팀장만)' })
+  deleteTeam(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.teamsService.deleteTeam(id, req.user.id);
+  }
+
   @Delete(':id/members/:userId')
   @HttpCode(204)
   @ApiOperation({ summary: '멤버 탈퇴 / 추방' })
