@@ -47,7 +47,7 @@ function dueState(due: string | null): {
         : diff === 1
           ? "내일"
           : `${d.getMonth() + 1}/${d.getDate()}`;
-  return { danger: diff <= 1, warn: diff > 1 && diff <= 3, label };
+  return { danger: diff <= 0, warn: diff >= 1 && diff <= 3, label };
 }
 
 const DIFF_CHIPS = [
