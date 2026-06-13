@@ -41,7 +41,4 @@ export class Agenda {
   // 완료 시 LLM 생성 요약
   @Column({ type: 'text', nullable: true })
   summary!: string | null;
-
-  @Column({ type: 'bigint', unsigned: true, nullable: true })
-  milestone_id!: number | null;
 }

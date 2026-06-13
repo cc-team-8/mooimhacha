@@ -58,7 +58,6 @@ export class AgendasService {
       title: dto.title,
       estimated_minutes: dto.estimated_minutes ?? 0,
       order_index: (max?.max ?? -1) + 1,
-      milestone_id: dto.milestone_id ?? null,
       // 회의 진행 중 추가는 즉석(ad_hoc), 그 외는 manual 기본
       source: dto.source ?? (meeting.status === 'active' ? 'ad_hoc' : 'manual'),
       status: 'pending',
@@ -72,7 +71,6 @@ export class AgendasService {
     if (dto.estimated_minutes !== undefined)
       agenda.estimated_minutes = dto.estimated_minutes;
     if (dto.order_index !== undefined) agenda.order_index = dto.order_index;
-    if (dto.milestone_id !== undefined) agenda.milestone_id = dto.milestone_id;
     if (dto.status !== undefined) {
       return this.setStatus(userId, agendaId, dto.status);
     }

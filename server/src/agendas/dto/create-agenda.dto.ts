@@ -21,11 +21,6 @@ export class CreateAgendaDto {
   @Min(0)
   estimated_minutes?: number;
 
-  @ApiPropertyOptional({ description: '연결 마일스톤 ID' })
-  @IsOptional()
-  @IsInt()
-  milestone_id?: number;
-
   @ApiPropertyOptional({ enum: ['ai_recommended', 'manual', 'ad_hoc'] })
   @IsOptional()
   @IsIn(['ai_recommended', 'manual', 'ad_hoc'])

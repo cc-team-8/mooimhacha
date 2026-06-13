@@ -32,9 +32,4 @@ export class UpdateAgendaDto {
   @IsOptional()
   @IsIn(['pending', 'active', 'done'])
   status?: AgendaStatus;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  milestone_id?: number;
 }
