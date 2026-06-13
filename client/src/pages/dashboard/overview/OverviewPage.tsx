@@ -53,7 +53,9 @@ export default function OverviewPage() {
     let alive = true;
     void Promise.allSettled([
       apiGet<Meeting[]>(`/meetings?team_id=${team.id}`),
-      apiGet<{ members: TeamContribution[] }>(`/teams/${team.id}/contributions`),
+      apiGet<{ members: TeamContribution[] }>(
+        `/teams/${team.id}/contributions`,
+      ),
       apiGet<ActionItem[]>(`/action-items?team_id=${team.id}`),
     ]).then(([ms, cs, ts]) => {
       if (!alive) return;
@@ -83,13 +85,12 @@ export default function OverviewPage() {
           new Date(a.due_date as string).getTime() -
           new Date(b.due_date as string).getTime(),
       )[0];
-    const freeRiders = contrib.filter(
-      (c) => c.composite_score != null && c.composite_score < 0.1,
-    );
     // 경보: 오늘/내일 마감인데 미시작(todo) 태스크 — 담당자별 묶음의 첫 항목
     const urgent = open.filter((t) => {
       const d = dueLabel(t.due_date);
-      return t.status === "todo" && d && (d.text === "오늘" || d.text === "내일");
+      return (
+        t.status === "todo" && d && (d.text === "오늘" || d.text === "내일")
+      );
     });
     const nameById = new Map(contrib.map((c) => [c.user_id, c.name]));
     const active = meetings.find((m) => m.status === "active");
@@ -112,7 +113,6 @@ export default function OverviewPage() {
       done,
       open,
       nextDue,
-      freeRiders,
       urgent,
       nameById,
       active,
@@ -141,7 +141,9 @@ export default function OverviewPage() {
   const taskPct = derived.visible.length
     ? Math.round((derived.done.length / derived.visible.length) * 100)
     : 0;
-  const nextDueInfo = derived.nextDue ? dueLabel(derived.nextDue.due_date) : null;
+  const nextDueInfo = derived.nextDue
+    ? dueLabel(derived.nextDue.due_date)
+    : null;
   const focusMeeting = derived.active ?? derived.nextScheduled;
 
   return (
@@ -153,11 +155,6 @@ export default function OverviewPage() {
             "담당자 미지정"}
           님의 태스크 {derived.urgent.length}개가 곧 마감입니다. 아직 시작하지
           않았어요.
-        </div>
-      ) : derived.freeRiders.length > 0 ? (
-        <div className="alert-bar">
-          <i className="ti ti-alert-triangle" /> {derived.freeRiders[0].name}
-          님의 기여도가 10% 미만입니다. 역할 분배를 점검해 보세요.
         </div>
       ) : null}
 
@@ -175,24 +172,10 @@ export default function OverviewPage() {
             sub: `${derived.done.length} / ${derived.visible.length} 완료`,
           },
           {
-            lbl: "다음 마감",
+            lbl: "다음 마감 태스크",
             val: nextDueInfo?.text ?? "—",
             sub: derived.nextDue?.description ?? "예정된 마감 없음",
             valStyle: { fontSize: 20, paddingTop: 8 } as const,
-          },
-          {
-            lbl: "무임승차 경보",
-            val: `${derived.freeRiders.length}명`,
-            sub: derived.freeRiders[0]
-              ? `${derived.freeRiders[0].name} · 기여도 ${Math.round(
-                  (derived.freeRiders[0].composite_score ?? 0) * 100,
-                )}%`
-              : "이상 없음",
-            valStyle: {
-              color: derived.freeRiders.length
-                ? "var(--coral)"
-                : undefined,
-            } as const,
           },
         ].map((s) => (
           <div key={s.lbl} className="stat-card">
@@ -244,11 +227,16 @@ export default function OverviewPage() {
                   </span>
                   <span
                     className="c-pct"
-                    style={pct == null ? { color: "var(--text-soft)" } : undefined}
+                    style={
+                      pct == null ? { color: "var(--text-soft)" } : undefined
+                    }
                   >
                     {pct == null ? "-%" : `${pct}%`}
                   </span>
-                  <span className="c-task" style={{ color: "var(--text-soft)" }}>
+                  <span
+                    className="c-task"
+                    style={{ color: "var(--text-soft)" }}
+                  >
                     {myTasks.length
                       ? `태스크 ${myDone.length}/${myTasks.length}`
                       : "-"}
@@ -273,7 +261,8 @@ export default function OverviewPage() {
             )}
           </div>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
-            {focusMeeting?.topic ?? (focusMeeting ? "제목 없는 회의" : "예정된 회의 없음")}
+            {focusMeeting?.topic ??
+              (focusMeeting ? "제목 없는 회의" : "예정된 회의 없음")}
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
             {focusMeeting
