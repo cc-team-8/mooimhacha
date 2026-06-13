@@ -63,21 +63,6 @@
 | GET    | `/api/teams/:id/settings` | 기여도 산정 설정 조회 |
 | PATCH  | `/api/teams/:id/settings` | 설정 수정 (팀장만)    |
 
-### 프로젝트·마일스톤 (Projects / Milestones)
-
-마일스톤은 팀이 아닌 **프로젝트 하위**로 묶인다 ([03](03-데이터-모델.md)).
-
-| 메서드 | 경로                            | 설명                            |
-| ------ | ------------------------------- | ------------------------------- |
-| GET    | `/api/projects`                 | 팀 프로젝트 목록 (`?team_id` 필수) |
-| POST   | `/api/projects`                 | 프로젝트 생성                   |
-| PATCH  | `/api/projects/:id`             | 프로젝트 수정                   |
-| DELETE | `/api/projects/:id`             | 프로젝트 삭제                   |
-| GET    | `/api/projects/:id/milestones`  | 마일스톤 목록 (진척도 동적 계산) |
-| POST   | `/api/projects/:id/milestones`  | 마일스톤 추가                   |
-| PATCH  | `/api/milestones/:id`           | 마일스톤 수정                   |
-| DELETE | `/api/milestones/:id`           | 마일스톤 삭제                   |
-
 ### 회의 (Meetings)
 
 | 메서드 | 경로                                        | 설명                                          |
