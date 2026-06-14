@@ -142,6 +142,29 @@ export interface TeamDetail extends Team {
   settings?: TeamSettings | null;
 }
 
+export interface TranscriptGroup {
+  user_id: number;
+  agenda_id: number | null;
+  text: string;
+  started_at_offset_ms: number;
+  ended_at_offset_ms: number;
+  is_short: boolean;
+  utterance_ids: number[];
+}
+
+export interface TranscriptSection {
+  agenda_id: number;
+  title: string;
+  status: string;
+  summary: string | null;
+  groups: TranscriptGroup[];
+}
+
+export interface Transcript {
+  meeting_id: number;
+  sections: TranscriptSection[];
+}
+
 export interface Notification {
   id: number;
   type: "meeting_soon" | "action_assigned" | "meeting_confirmed";

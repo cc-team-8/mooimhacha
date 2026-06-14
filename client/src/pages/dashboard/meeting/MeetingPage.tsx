@@ -14,6 +14,8 @@ import type {
   MeetingAttendance,
   AttendanceSummary,
   AttendanceStatus,
+  Transcript,
+  TeamSettings,
 } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
 
@@ -51,8 +53,7 @@ function meetingMeta(m: Meeting, memberCount: number): string {
     const mins = Math.max(
       1,
       Math.round(
-        (new Date(m.ended_at).getTime() -
-          new Date(m.t0_timestamp).getTime()) /
+        (new Date(m.ended_at).getTime() - new Date(m.t0_timestamp).getTime()) /
           60000,
       ),
     );
@@ -70,8 +71,10 @@ export default function MeetingPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [speak, setSpeak] = useState<MeetingContribution[]>([]);
+  const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance | null>(null);
+  const [teamSettings, setTeamSettings] = useState<TeamSettings | null>(null);
   const [absenceInput, setAbsenceInput] = useState("");
   // 회의별 출결 요약 (목록 배지·미처리 표시용)
   const [summaries, setSummaries] = useState<Map<number, AttendanceSummary>>(
@@ -96,6 +99,9 @@ export default function MeetingPage() {
 
   // 새 회의 모달 입력값
   const [newTopic, setNewTopic] = useState("");
+  const [newMeetingType, setNewMeetingType] = useState<"regular" | "partial">(
+    "regular",
+  );
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("15:00");
   // 입력 중 빈 값을 허용하기 위해 ""도 담는다 — 제출 시 기본값으로 보정
@@ -169,11 +175,13 @@ export default function MeetingPage() {
     if (!selectedId) {
       setAgendas([]);
       setSpeak([]);
+      setTranscript(null);
       setDecisions([]);
       return;
     }
     let alive = true;
     barsAnimated.current = false;
+    setTranscript(null);
     void Promise.allSettled([
       apiGet<Agenda[]>(`/meetings/${selectedId}/agendas`),
       apiGet<{ scores: MeetingContribution[] }>(
@@ -209,8 +217,17 @@ export default function MeetingPage() {
     setAttendance(null);
     if (tab === "attendance" && selected?.status === "ended" && selectedId) {
       void loadAttendance(selectedId);
+      if (!teamSettings && team) {
+        void apiGet<TeamSettings>(`/teams/${team.id}/settings`).then(setTeamSettings).catch(() => null);
+      }
     }
   }, [tab, selectedId, selected?.status, loadAttendance]);
+
+  useEffect(() => {
+    if (tab === "speak" && selected?.status === "ended" && selectedId && !transcript) {
+      void apiGet<Transcript>(`/meetings/${selectedId}/transcript`).then(setTranscript).catch(() => null);
+    }
+  }, [tab, selectedId, selected?.status, transcript]);
 
   // 진행 중 회의 경과 시간 — t0 기준 실측, 1초 틱
   useEffect(() => {
@@ -243,6 +260,18 @@ export default function MeetingPage() {
     String(Math.floor(s / 60)).padStart(2, "0") +
     ":" +
     String(s % 60).padStart(2, "0");
+
+  const fmtAgTime = (ag: Agenda) => {
+    if (ag.started_at_offset_ms != null && ag.ended_at_offset_ms != null) {
+      const totalSec = Math.round(
+        (ag.ended_at_offset_ms - ag.started_at_offset_ms) / 1000,
+      );
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return s > 0 ? `${m}분 ${s}초` : `${m}분`;
+    }
+    return `${ag.actual_minutes ?? ag.estimated_minutes}분`;
+  };
 
   // 추가/수정 겸용 — editingDecision이 있으면 PATCH, 없으면 POST
   async function saveDecision() {
@@ -286,9 +315,7 @@ export default function MeetingPage() {
     setBusy(true);
     try {
       await apiDelete(`/decisions/${deletingDecision.id}`);
-      setDecisions((prev) =>
-        prev.filter((d) => d.id !== deletingDecision.id),
-      );
+      setDecisions((prev) => prev.filter((d) => d.id !== deletingDecision.id));
       setDeletingDecision(null);
       showToast("결정 사항이 삭제되었습니다");
     } catch (e) {
@@ -361,6 +388,7 @@ export default function MeetingPage() {
   // 새 회의 모달 닫기 — 아젠다 입력 잔존 방지
   function closeMeetingModal() {
     setModalOpen(null);
+    setNewMeetingType("regular");
     setNewAgendaList([]);
     setNewAgendaInput("");
     setNewAgendaMinutes("");
@@ -383,6 +411,7 @@ export default function MeetingPage() {
         scheduled_at: new Date(`${newDate}T${newTime}:00`).toISOString(),
         total_minutes: newMinutes,
         topic: newTopic.trim() || undefined,
+        meeting_type: newMeetingType,
       });
       // 추가한 아젠다를 순서대로 등록 — 예상 시간은 입력한 경우에만 전송(선택)
       for (const ag of newAgendaList) {
@@ -393,6 +422,7 @@ export default function MeetingPage() {
       }
       setModalOpen(null);
       setNewTopic("");
+      setNewMeetingType("regular");
       setNewDate("");
       setNewAgendaList([]);
       setNewAgendaInput("");
@@ -508,7 +538,9 @@ export default function MeetingPage() {
   const lowSpeaker = speak.find(
     (s) => s.speech_ratio != null && s.speech_ratio < 0.1,
   );
-  const headMeta = selected ? meetingMeta(selected, team?.member_count ?? 0) : "";
+  const headMeta = selected
+    ? meetingMeta(selected, team?.member_count ?? 0)
+    : "";
 
   return (
     <>
@@ -527,7 +559,11 @@ export default function MeetingPage() {
           <div className="msb-list scroll">
             {meetings.length === 0 && (
               <div
-                style={{ padding: 14, fontSize: 12.5, color: "var(--text-soft)" }}
+                style={{
+                  padding: 14,
+                  fontSize: 12.5,
+                  color: "var(--text-soft)",
+                }}
               >
                 아직 회의가 없습니다. + 버튼으로 만들어 보세요.
               </div>
@@ -542,44 +578,44 @@ export default function MeetingPage() {
                         m.status === "ended" ? summaries.get(m.id) : undefined;
                       const attBadge = sum ? ATT_BADGE[sum.my_status] : null;
                       return (
-                      <div
-                        key={m.id}
-                        className={`mcard ${m.id === selectedId ? "sel" : ""}`}
-                        onClick={() => setSelectedId(m.id)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="mcard-top">
-                          <div className="mcard-name">
-                            {m.topic ?? "제목 없는 회의"}
-                          </div>
-                          {/* 완료 옆에 내 출결 표시 */}
-                          {attBadge && (
-                            <span
-                              className="mcard-att"
-                              style={{
-                                color: attBadge.color,
-                                background: attBadge.bg,
-                              }}
-                            >
-                              {attBadge.label}
+                        <div
+                          key={m.id}
+                          className={`mcard ${m.id === selectedId ? "sel" : ""}`}
+                          onClick={() => setSelectedId(m.id)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <div className="mcard-top">
+                            <div className="mcard-name">
+                              {m.topic ?? "제목 없는 회의"}
+                            </div>
+                            {/* 완료 옆에 내 출결 표시 */}
+                            {attBadge && (
+                              <span
+                                className="mcard-att"
+                                style={{
+                                  color: attBadge.color,
+                                  background: attBadge.bg,
+                                }}
+                              >
+                                {attBadge.label}
+                              </span>
+                            )}
+                            <span className={`spill ${spillCls[m.status]}`}>
+                              {spillLabel[m.status]}
                             </span>
+                          </div>
+                          <div className="mcard-meta">
+                            {meetingMeta(m, team?.member_count ?? 0)}
+                          </div>
+                          {sum && sum.pending_count > 0 && (
+                            <div className="mcard-att-row">
+                              <span className="mcard-pending">
+                                <i className="ti ti-alert-circle" /> 미처리{" "}
+                                {sum.pending_count}건
+                              </span>
+                            </div>
                           )}
-                          <span className={`spill ${spillCls[m.status]}`}>
-                            {spillLabel[m.status]}
-                          </span>
                         </div>
-                        <div className="mcard-meta">
-                          {meetingMeta(m, team?.member_count ?? 0)}
-                        </div>
-                        {sum && sum.pending_count > 0 && (
-                          <div className="mcard-att-row">
-                            <span className="mcard-pending">
-                              <i className="ti ti-alert-circle" /> 미처리{" "}
-                              {sum.pending_count}건
-                            </span>
-                          </div>
-                        )}
-                      </div>
                       );
                     })}
                   </div>
@@ -591,7 +627,9 @@ export default function MeetingPage() {
         {/* 상세 */}
         <div className="mdetail">
           {!selected ? (
-            <div style={{ padding: 24, fontSize: 13.5, color: "var(--text-soft)" }}>
+            <div
+              style={{ padding: 24, fontSize: 13.5, color: "var(--text-soft)" }}
+            >
               왼쪽에서 회의를 선택하거나 새 회의를 만들어 보세요.
             </div>
           ) : (
@@ -642,25 +680,23 @@ export default function MeetingPage() {
                       "decision",
                       "summary",
                     ] as Tab[]
-                  ).map(
-                    (t) => (
-                      <div
-                        key={t}
-                        className={`tab ${tab === t ? "active" : ""}`}
-                        onClick={() => setTab(t)}
-                      >
+                  ).map((t) => (
+                    <div
+                      key={t}
+                      className={`tab ${tab === t ? "active" : ""}`}
+                      onClick={() => setTab(t)}
+                    >
+                      {
                         {
-                          {
-                            agenda: "아젠다",
-                            speak: "발언 기록",
-                            attendance: "출결",
-                            decision: "결정 사항",
-                            summary: "회의 요약",
-                          }[t]
-                        }
-                      </div>
-                    ),
-                  )}
+                          agenda: "아젠다",
+                          speak: "발언 기록",
+                          attendance: "출결",
+                          decision: "결정 사항",
+                          summary: "회의 요약",
+                        }[t]
+                      }
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -671,7 +707,11 @@ export default function MeetingPage() {
                     <div className="panel-label">아젠다 진행</div>
                     {agendas.length === 0 && (
                       <div
-                        style={{ fontSize: 12.5, color: "var(--text-soft)", padding: "4px 0 8px" }}
+                        style={{
+                          fontSize: 12.5,
+                          color: "var(--text-soft)",
+                          padding: "4px 0 8px",
+                        }}
                       >
                         등록된 아젠다가 없습니다.
                       </div>
@@ -680,7 +720,10 @@ export default function MeetingPage() {
                       const cur = a.status === "active";
                       const done = a.status === "done";
                       return (
-                        <div key={a.id} className={`ag-item ${cur ? "cur" : ""}`}>
+                        <div
+                          key={a.id}
+                          className={`ag-item ${cur ? "cur" : ""}`}
+                        >
                           <div className="ag-num">
                             {cur ? (
                               <i
@@ -688,7 +731,10 @@ export default function MeetingPage() {
                                 style={{ fontSize: 9 }}
                               />
                             ) : done ? (
-                              <i className="ti ti-check" style={{ fontSize: 10 }} />
+                              <i
+                                className="ti ti-check"
+                                style={{ fontSize: 10 }}
+                              />
                             ) : (
                               i + 1
                             )}
@@ -696,12 +742,12 @@ export default function MeetingPage() {
                           <div className="ag-text">{a.title}</div>
                           <div className="ag-prog">
                             <i
-                              style={{ width: done ? "100%" : cur ? "60%" : "0%" }}
+                              style={{
+                                width: done ? "100%" : cur ? "60%" : "0%",
+                              }}
                             />
                           </div>
-                          <div className="ag-time">
-                            {a.actual_minutes ?? a.estimated_minutes}분
-                          </div>
+                          <div className="ag-time">{fmtAgTime(a)}</div>
                         </div>
                       );
                     })}
@@ -756,7 +802,8 @@ export default function MeetingPage() {
                         s.speech_ratio == null
                           ? 0
                           : Math.round(s.speech_ratio * 100);
-                      const warn = s.speech_ratio != null && s.speech_ratio < 0.1;
+                      const warn =
+                        s.speech_ratio != null && s.speech_ratio < 0.1;
                       return (
                         <div key={s.user_id} className="speak-row">
                           <div className={`av a${(i % 4) + 1} av-sm`}>
@@ -799,13 +846,54 @@ export default function MeetingPage() {
                         물어봐 주세요.
                       </div>
                     )}
+                    {/* 발화 기록 — 종료된 회의만 */}
+                    {selected.status === "ended" && (
+                      <>
+                        <div className="panel-label" style={{ marginTop: 18 }}>발화 기록</div>
+                        {!transcript ? (
+                          <div style={{ fontSize: 12.5, color: "var(--text-soft)" }}>불러오는 중…</div>
+                        ) : transcript.sections.every((s) => s.groups.length === 0) ? (
+                          <div className="summary-box"><i className="ti ti-info-circle" />저장된 발화 기록이 없습니다.</div>
+                        ) : (
+                          transcript.sections.filter((s) => s.groups.length > 0).map((section) => (
+                            <div key={section.agenda_id} className="utt-section">
+                              <div className="utt-section-title">{section.title}</div>
+                              {section.groups.map((g, gi) => {
+                                const speaker = speak.find((s) => s.user_id === g.user_id);
+                                const idx = speak.findIndex((s) => s.user_id === g.user_id);
+                                return (
+                                  <div key={gi} className="utt-row">
+                                    <div className={`av a${(idx % 4) + 1} av-sm`}>{(speaker?.name ?? "?")[0]}</div>
+                                    <div className="utt-body">
+                                      <span className="utt-name">{speaker?.name ?? `사용자 ${g.user_id}`}<span className="utt-time">{fmt(Math.floor(g.started_at_offset_ms / 1000))}</span></span>
+                                      <span className="utt-text">{g.text}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
                 {/* 출결 */}
                 {tab === "attendance" && (
                   <div className="tab-panel active">
-                    <div className="panel-label">출결 현황</div>
+                    <div className="panel-label">출결 현황
+                      {(() => {
+                        const grace = teamSettings?.punctuality_grace_ratio ?? 0.1;
+                        const totalMin = selected.total_minutes;
+                        const graceMin = Math.round(totalMin * grace);
+                        return (
+                          <span className="info-tip" data-tip={`회의 시작 후 ${graceMin}분(총 ${totalMin}분의 ${Math.round(grace * 100)}%) 이내 입장 → 출석\n초과 입장 → 지각\n입장 기록 없음 → 결석`}>
+                            <i className="ti ti-info-circle" />
+                          </span>
+                        );
+                      })()}
+                    </div>
                     {selected.status !== "ended" ? (
                       <div className="summary-box">
                         <i className="ti ti-info-circle" />
@@ -824,13 +912,18 @@ export default function MeetingPage() {
                           const isMe = me?.id === mem.user_id;
                           return (
                             <div key={mem.user_id} className="att-row">
-                              <div className={`av a${(mem.user_id % 4) + 1} av-sm`}>
+                              <div
+                                className={`av a${(mem.user_id % 4) + 1} av-sm`}
+                              >
                                 {mem.name[0]}
                               </div>
                               <span className="att-name">{mem.name}</span>
                               <span
                                 className="att-badge"
-                                style={{ color: badge.color, background: badge.bg }}
+                                style={{
+                                  color: badge.color,
+                                  background: badge.bg,
+                                }}
                               >
                                 {badge.label}
                                 {mem.status === "late" &&
@@ -895,7 +988,10 @@ export default function MeetingPage() {
 
                 {/* 결정 사항 */}
                 {tab === "decision" && (
-                  <div className="tab-panel active">
+                  <div
+                    className="tab-panel active"
+                    style={{ overflow: "hidden" }}
+                  >
                     <div
                       className="panel-label"
                       style={{ display: "flex", alignItems: "center" }}
@@ -913,39 +1009,43 @@ export default function MeetingPage() {
                         <i className="ti ti-plus" /> 추가
                       </button>
                     </div>
-                    {decisions.length === 0 && (
-                      <div style={{ fontSize: 12.5, color: "var(--text-soft)" }}>
-                        아직 기록된 결정이 없습니다.
-                      </div>
-                    )}
-                    {decisions.map((d) => (
-                      <div key={d.id} className="dec-item">
-                        <div className="dec-ic">
-                          <i className="ti ti-check" />
+                    <div className="dec-list scroll">
+                      {decisions.length === 0 && (
+                        <div
+                          style={{ fontSize: 12.5, color: "var(--text-soft)" }}
+                        >
+                          아직 기록된 결정이 없습니다.
                         </div>
-                        <div className="dec-text">{d.content}</div>
-                        <div className="dec-actions">
-                          <button
-                            className="dec-act"
-                            aria-label="결정 수정"
-                            onClick={() => {
-                              setEditingDecision(d);
-                              setDecInput(d.content);
-                              setModalOpen("decision");
-                            }}
-                          >
-                            <i className="ti ti-pencil" />
-                          </button>
-                          <button
-                            className="dec-act dec-act--danger"
-                            aria-label="결정 삭제"
-                            onClick={() => setDeletingDecision(d)}
-                          >
-                            <i className="ti ti-trash" />
-                          </button>
+                      )}
+                      {decisions.map((d) => (
+                        <div key={d.id} className="dec-item">
+                          <div className="dec-ic">
+                            <i className="ti ti-check" />
+                          </div>
+                          <div className="dec-text">{d.content}</div>
+                          <div className="dec-actions">
+                            <button
+                              className="dec-act"
+                              aria-label="결정 수정"
+                              onClick={() => {
+                                setEditingDecision(d);
+                                setDecInput(d.content);
+                                setModalOpen("decision");
+                              }}
+                            >
+                              <i className="ti ti-pencil" />
+                            </button>
+                            <button
+                              className="dec-act dec-act--danger"
+                              aria-label="결정 삭제"
+                              onClick={() => setDeletingDecision(d)}
+                            >
+                              <i className="ti ti-trash" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -963,8 +1063,8 @@ export default function MeetingPage() {
                     ) : (
                       <div className="summary-box">
                         <i className="ti ti-sparkles" />
-                        회의가 종료되면 AI가 자동으로 결정사항·액션아이템·회의록을
-                        요약합니다.
+                        회의가 종료되면 AI가 자동으로
+                        결정사항·액션아이템·회의록을 요약합니다.
                       </div>
                     )}
                   </div>
@@ -1006,6 +1106,25 @@ export default function MeetingPage() {
               value={newTopic}
               onChange={(e) => setNewTopic(e.target.value)}
             />
+          </div>
+          <div className="field">
+            <label className="field-label">회의 유형</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className={`btn btn-sm${newMeetingType === "regular" ? " btn-primary" : ""}`}
+                onClick={() => setNewMeetingType("regular")}
+              >
+                전체 회의
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm${newMeetingType === "partial" ? " btn-primary" : ""}`}
+                onClick={() => setNewMeetingType("partial")}
+              >
+                부분 회의
+              </button>
+            </div>
           </div>
           <div className="field-row">
             <div className="field">
@@ -1244,7 +1363,9 @@ export default function MeetingPage() {
               min={1}
               value={agMinutes}
               onChange={(e) =>
-                setAgMinutes(e.target.value === "" ? "" : Number(e.target.value))
+                setAgMinutes(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
               }
             />
           </div>
