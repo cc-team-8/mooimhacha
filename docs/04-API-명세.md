@@ -4,16 +4,16 @@
 
 ### 인증 (Auth)
 
-| 메서드 | 경로                       | 설명                                          |
-| ------ | -------------------------- | --------------------------------------------- |
-| GET    | `/api/auth/kakao/url`      | 카카오 인가 URL 발급 (클라이언트가 이동)      |
+| 메서드 | 경로                       | 설명                                           |
+| ------ | -------------------------- | ---------------------------------------------- |
+| GET    | `/api/auth/kakao/url`      | 카카오 인가 URL 발급 (클라이언트가 이동)       |
 | GET    | `/api/auth/kakao/callback` | 인가 콜백 — 토큰 발급 후 클라이언트 리다이렉트 |
-| POST   | `/api/auth/kakao`          | 카카오 인가 코드로 로그인/회원가입            |
-| PATCH  | `/api/auth/profile`        | 신규 가입자 대학교·학과 등록                  |
-| GET    | `/api/auth/me`             | 현재 로그인 사용자 정보                       |
-| POST   | `/api/auth/refresh`        | refresh_token으로 access_token 재발급         |
-| POST   | `/api/auth/logout`         | 로그아웃 (204)                                |
-| DELETE | `/api/auth/me`             | 회원 탈퇴 — 익명화 + 전 팀 탈퇴               |
+| POST   | `/api/auth/kakao`          | 카카오 인가 코드로 로그인/회원가입             |
+| PATCH  | `/api/auth/profile`        | 신규 가입자 대학교·학과 등록                   |
+| GET    | `/api/auth/me`             | 현재 로그인 사용자 정보                        |
+| POST   | `/api/auth/refresh`        | refresh_token으로 access_token 재발급          |
+| POST   | `/api/auth/logout`         | 로그아웃 (204)                                 |
+| DELETE | `/api/auth/me`             | 회원 탈퇴 — 익명화 + 전 팀 탈퇴                |
 
 카카오 콜백 (`GET /api/auth/kakao/callback`):
 
@@ -65,32 +65,32 @@
 
 ### 회의 (Meetings)
 
-| 메서드 | 경로                                        | 설명                                          |
-| ------ | ------------------------------------------- | --------------------------------------------- |
-| GET    | `/api/meetings`                             | 내 회의 목록 (`?team_id`로 필터)              |
-| POST   | `/api/meetings`                             | 회의 생성                                     |
-| GET    | `/api/meetings/:id`                         | 회의 상세                                     |
-| PATCH  | `/api/meetings/:id`                         | 회의 수정                                     |
-| DELETE | `/api/meetings/:id`                         | 회의 삭제 (팀장)                              |
-| POST   | `/api/meetings/:id/start`                   | 회의 시작 — T0 발행, status → active          |
-| POST   | `/api/meetings/:id/end`                     | 종료 — 발화 그루핑 + 기여도(①) 산정 트리거    |
-| GET    | `/api/meetings/:id/transcript`              | 회의록 (안건별 그루핑)                        |
-| POST   | `/api/meetings/:id/summarize`               | AI 회의 종합 정리 (요약·누락 결정·태스크) ⏱   |
-| POST   | `/api/meetings/:id/confirm`                 | 회의 산출물 확정 (팀장)                       |
+| 메서드 | 경로                                        | 설명                                           |
+| ------ | ------------------------------------------- | ---------------------------------------------- |
+| GET    | `/api/meetings`                             | 내 회의 목록 (`?team_id`로 필터)               |
+| POST   | `/api/meetings`                             | 회의 생성                                      |
+| GET    | `/api/meetings/:id`                         | 회의 상세                                      |
+| PATCH  | `/api/meetings/:id`                         | 회의 수정                                      |
+| DELETE | `/api/meetings/:id`                         | 회의 삭제 (팀장)                               |
+| POST   | `/api/meetings/:id/start`                   | 회의 시작 — T0 발행, status → active           |
+| POST   | `/api/meetings/:id/end`                     | 종료 — 발화 그루핑 + 기여도(①) 산정 트리거     |
+| GET    | `/api/meetings/:id/transcript`              | 회의록 (안건별 그루핑)                         |
+| POST   | `/api/meetings/:id/summarize`               | AI 회의 종합 정리 (요약·누락 결정·태스크) ⏱    |
+| POST   | `/api/meetings/:id/confirm`                 | 회의 산출물 확정 (팀장)                        |
 | POST   | `/api/meetings/:id/contributions/recompute` | 기여도 재산정 (종료된 회의 — 산정 실패 복구용) |
 
 ⏱ LLM 호출 라우트는 비용 방어용 스로틀 적용 (분당 3회).
 
 ### 안건 (Agendas)
 
-| 메서드 | 경로                                 | 설명                                          |
-| ------ | ------------------------------------ | --------------------------------------------- |
-| GET    | `/api/meetings/:id/agendas`          | 안건 목록                                     |
-| POST   | `/api/meetings/:id/agendas`          | 안건 추가 (회의 중 즉석 추가 포함)            |
-| PATCH  | `/api/agendas/:id`                   | 안건 수정 (상태 변경 포함)                    |
-| DELETE | `/api/agendas/:id`                   | 안건 삭제                                     |
-| POST   | `/api/agendas/:id/activate`          | 안건 활성화 (기존 active는 pending으로)       |
-| POST   | `/api/agendas/:id/summarize`         | 안건 LLM 요약 (완료 시) ⏱                     |
+| 메서드 | 경로                                 | 설명                                            |
+| ------ | ------------------------------------ | ----------------------------------------------- |
+| GET    | `/api/meetings/:id/agendas`          | 안건 목록                                       |
+| POST   | `/api/meetings/:id/agendas`          | 안건 추가 (회의 중 즉석 추가 포함)              |
+| PATCH  | `/api/agendas/:id`                   | 안건 수정 (상태 변경 포함)                      |
+| DELETE | `/api/agendas/:id`                   | 안건 삭제                                       |
+| POST   | `/api/agendas/:id/activate`          | 안건 활성화 (기존 active는 pending으로)         |
+| POST   | `/api/agendas/:id/summarize`         | 안건 LLM 요약 (완료 시) ⏱                       |
 | POST   | `/api/meetings/:id/agendas/generate` | 다음 회의 안건 LLM 생성 (직전 회의 결과 기반) ⏱ |
 
 ### 발화 (Utterances)
@@ -98,31 +98,31 @@
 발화 **생성은 REST가 아닌 WebSocket**(`utterance:new`)으로만 한다 (아래 WebSocket 이벤트 참조).
 조회는 회의록(`GET /api/meetings/:id/transcript`)에 안건별로 그루핑되어 포함된다.
 
-| 메서드 | 경로                                          | 설명                                         |
-| ------ | --------------------------------------------- | -------------------------------------------- |
-| PATCH  | `/api/meetings/:id/utterances/batch`          | 병합 그룹 발화 일괄 정정 (트랜잭션 + 재산정 1회) |
-| PATCH  | `/api/meetings/:id/utterances/:utteranceId`   | 발화 정정 (본인 발화, 종료된 회의만)         |
-| DELETE | `/api/meetings/:id/utterances/:utteranceId`   | 발화 삭제 (본인 발화, 종료된 회의만)         |
+| 메서드 | 경로                                        | 설명                                             |
+| ------ | ------------------------------------------- | ------------------------------------------------ |
+| PATCH  | `/api/meetings/:id/utterances/batch`        | 병합 그룹 발화 일괄 정정 (트랜잭션 + 재산정 1회) |
+| PATCH  | `/api/meetings/:id/utterances/:utteranceId` | 발화 정정 (본인 발화, 종료된 회의만)             |
+| DELETE | `/api/meetings/:id/utterances/:utteranceId` | 발화 삭제 (본인 발화, 종료된 회의만)             |
 
 ### 결정사항 (Decisions)
 
-| 메서드 | 경로                 | 설명                              |
-| ------ | -------------------- | --------------------------------- |
-| GET    | `/api/decisions`     | 결정 목록 (`?meeting_id` 필수)    |
-| POST   | `/api/decisions`     | 결정 추가                         |
-| PATCH  | `/api/decisions/:id` | 내용 수정 또는 확정 처리          |
-| DELETE | `/api/decisions/:id` | 결정 삭제                         |
+| 메서드 | 경로                 | 설명                           |
+| ------ | -------------------- | ------------------------------ |
+| GET    | `/api/decisions`     | 결정 목록 (`?meeting_id` 필수) |
+| POST   | `/api/decisions`     | 결정 추가                      |
+| PATCH  | `/api/decisions/:id` | 내용 수정 또는 확정 처리       |
+| DELETE | `/api/decisions/:id` | 결정 삭제                      |
 
 회의 중 추가는 WebSocket `decision:new`로도 가능 (broadcast 포함).
 
 ### 액션 아이템 (Action Items) — 팀 단위 스코프
 
-| 메서드 | 경로                    | 설명                                          |
-| ------ | ----------------------- | --------------------------------------------- |
+| 메서드 | 경로                    | 설명                                             |
+| ------ | ----------------------- | ------------------------------------------------ |
 | GET    | `/api/action-items`     | 액션 목록 (`?team_id` 필수, `?assignee_id` 선택) |
-| POST   | `/api/action-items`     | 액션 추가 (team_id 필수)                      |
-| PATCH  | `/api/action-items/:id` | 내용·상태·완료·확정 수정                      |
-| DELETE | `/api/action-items/:id` | 액션 삭제                                     |
+| POST   | `/api/action-items`     | 액션 추가 (team_id 필수)                         |
+| PATCH  | `/api/action-items/:id` | 내용·상태·완료·확정 수정                         |
+| DELETE | `/api/action-items/:id` | 액션 삭제                                        |
 
 회의 중 추가는 WebSocket `action:new`로도 가능 (broadcast 포함).
 
@@ -137,12 +137,11 @@
 | ③   | 테스크 기여도    | user×team    | (완료율+마감준수)/2 — `action_items`에서 라이브 | `GET /api/teams/:id/contributions`    |
 | ④   | 종합 기여도      | user×team    | min(1.0, (③×w + ②×(1−w)) × (1+n))               | `GET /api/teams/:id/contributions`    |
 
-| 메서드 | 경로                                        | 설명                                       |
-| ------ | ------------------------------------------- | ------------------------------------------ |
-| GET    | `/api/meetings/:id/contributions`           | ① 회의 참여자별 meeting_score (저장값)     |
-| GET    | `/api/teams/:id/contributions`              | ②③④ 팀 멤버별 종합 기여도 (동적 계산)      |
+| 메서드 | 경로                                        | 설명                                        |
+| ------ | ------------------------------------------- | ------------------------------------------- |
+| GET    | `/api/meetings/:id/contributions`           | ① 회의 참여자별 meeting_score (저장값)      |
+| GET    | `/api/teams/:id/contributions`              | ②③④ 팀 멤버별 종합 기여도 (동적 계산)       |
 | POST   | `/api/meetings/:id/contributions/recompute` | 기여도(①) 재산정 (종료된 회의, 실패 복구용) |
-| POST   | `/api/teams/:teamId/contribution/calculate` | 외부 엔진 직접 호출 — body로 회의 데이터 전달 |
 
 `GET /api/teams/:id/contributions` 응답의 `members[]`에 레이더 차트(출석·참여도 축)용 필드 포함:
 
@@ -156,51 +155,70 @@
 
 ### 알림 (Notifications)
 
-| 메서드 | 경로                          | 설명                              |
-| ------ | ----------------------------- | --------------------------------- |
+| 메서드 | 경로                          | 설명                                     |
+| ------ | ----------------------------- | ---------------------------------------- |
 | GET    | `/api/notifications`          | 내 알림 목록 (`?unread=true`로 미읽음만) |
-| PATCH  | `/api/notifications/:id/read` | 알림 읽음 처리                    |
-| POST   | `/api/notifications/read-all` | 전체 읽음 처리                    |
+| PATCH  | `/api/notifications/:id/read` | 알림 읽음 처리                           |
+| POST   | `/api/notifications/read-all` | 전체 읽음 처리                           |
 
 알림 종류는 [03](03-데이터-모델.md) Notification 참조 (회의 5분 전 / 액션 확정 / 산출물 확정).
 
 ### 리포트 (Reports)
 
-| 메서드 | 경로                        | 설명                                |
-| ------ | --------------------------- | ----------------------------------- |
-| GET    | `/api/meetings/:id/report`  | 교수 제출용 회의 리포트 (인쇄용 HTML) |
+| 메서드 | 경로                       | 설명                                  |
+| ------ | -------------------------- | ------------------------------------- |
+| GET    | `/api/meetings/:id/report` | 교수 제출용 회의 리포트 (인쇄용 HTML) |
 
 ### 헬스체크
 
-| 메서드 | 경로          | 설명                          |
-| ------ | ------------- | ----------------------------- |
-| GET    | `/api/health` | 배포 헬스체크 (인증 불필요)   |
+| 메서드 | 경로          | 설명                        |
+| ------ | ------------- | --------------------------- |
+| GET    | `/api/health` | 배포 헬스체크 (인증 불필요) |
 
-### 사유 결석 (Meeting Absences) — P1, 미구현
+### 출결 / 사유 결석 (Meeting Absences)
 
-| 메서드 | 경로                         | 설명             |
-| ------ | ---------------------------- | ---------------- |
-| GET    | `/api/meetings/:id/absences` | 사유 결석 목록   |
-| POST   | `/api/meetings/:id/absences` | 결석 신청 (본인) |
-| PATCH  | `/api/absences/:id/approve`  | 승인 (팀장만)    |
-| DELETE | `/api/absences/:id`          | 삭제/거절        |
+| 메서드 | 경로                                | 설명                                                             |
+| ------ | ----------------------------------- | ---------------------------------------------------------------- |
+| GET    | `/api/teams/:id/attendance-summary` | 팀 회의 출결 요약 (목록용 — 내 출결 + 미처리 동의 수)            |
+| GET    | `/api/meetings/:id/attendance`      | 회의 출결 현황 (전 멤버 present/late/absent/excused + 사유·동의) |
+| POST   | `/api/meetings/:id/absences`        | 결석 사유 입력 (본인, 종료된 회의만)                             |
+| POST   | `/api/absences/:id/consent`         | 결석 사유 동의 (결석자 제외 팀원, 멱등)                          |
+
+출결 상태(`present`/`late`/`absent`/`excused`)는 별도 입력 없이 `presence_events`(입장 기록) + `contribution_scores`(정시성 점수) + `meeting_absences`(사유 승인 여부)로 자동 산출된다:
+
+- 입장 기록 없음 → `absent` (사유가 `approved`면 `excused`)
+- 입장했지만 `punctuality_score < 1` → `late` (지각 분 = 첫 입장 오프셋)
+- 그 외 → `present`
+
+결석 사유 입력 (`POST /api/meetings/:id/absences`):
+
+- 회의가 `ended` 상태이고 무효 처리(`is_invalidated`)되지 않았을 때만 입력 가능
+- 입장 기록이 있으면(실제 출석) 입력 불가 — 결석한 회의에만 입력
+- `approved` 상태인 기존 사유는 수정 불가
+
+동의 (`POST /api/absences/:id/consent`):
+
+- 본인 결석에는 동의할 수 없음
+- 동의 정족수 = 본인을 제외한 활성 팀원 수의 과반(`ceil((N-1)/2)`)
+- 정족수 도달 시 `pending → approved`로 자동 전환 — 팀장의 별도 승인 절차 없음
+- 거절/삭제 엔드포인트는 없음 (`rejected` 상태는 예약돼 있으나 현재 전이 로직 없음)
 
 ## WebSocket 이벤트
 
-| 이벤트                                 | 방향            | 용도                                          |
-| -------------------------------------- | --------------- | --------------------------------------------- |
-| `meeting:join` / `meeting:leave`       | client → server | 회의 룸 입·퇴장                               |
-| `meeting:t0`                           | server → client | 시각 동기화 기준점 (join 직후 + start 시 broadcast) |
-| `meeting:ended`                        | server → client | 회의 종료 broadcast                           |
-| `presence:update`                      | server → client | 참석자 입·퇴장 상태 broadcast                 |
+| 이벤트                                 | 방향            | 용도                                                           |
+| -------------------------------------- | --------------- | -------------------------------------------------------------- |
+| `meeting:join` / `meeting:leave`       | client → server | 회의 룸 입·퇴장                                                |
+| `meeting:t0`                           | server → client | 시각 동기화 기준점 (join 직후 + start 시 broadcast)            |
+| `meeting:ended`                        | server → client | 회의 종료 broadcast                                            |
+| `presence:update`                      | server → client | 참석자 입·퇴장 상태 broadcast                                  |
 | `utterance:new`                        | client → server | 확정 발화(텍스트) 전송 — ack로 `utterance_id`·`agenda_id` 반환 |
-| `contribution:update`                  | server → client | 기여도 갱신 (1초 디바운스)                    |
-| `agenda:status-change`                 | 양방향          | 안건 상태 변경 broadcast                      |
-| `agenda:summary`                       | server → client | 완료 안건의 LLM 요약 도착 broadcast           |
-| `decision:new` / `action:new`          | 양방향          | 결정·액션 추가 broadcast                      |
-| `user:speaking-start` / `speaking-end` | 양방향          | 발화 중 🎤 표시                               |
-| `anomaly:report`                       | client → server | 캡처 유실·STT 실패 등 이상 이벤트 기록        |
-| `error`                                | server → client | 인증 실패 등 오류 통지                        |
+| `contribution:update`                  | server → client | 기여도 갱신 (1초 디바운스)                                     |
+| `agenda:status-change`                 | 양방향          | 안건 상태 변경 broadcast                                       |
+| `agenda:summary`                       | server → client | 완료 안건의 LLM 요약 도착 broadcast                            |
+| `decision:new` / `action:new`          | 양방향          | 결정·액션 추가 broadcast                                       |
+| `user:speaking-start` / `speaking-end` | 양방향          | 발화 중 🎤 표시                                                |
+| `anomaly:report`                       | client → server | 캡처 유실·STT 실패 등 이상 이벤트 기록                         |
+| `error`                                | server → client | 인증 실패 등 오류 통지                                         |
 
 ## 발화 전송 페이로드 (`utterance:new`)
 
