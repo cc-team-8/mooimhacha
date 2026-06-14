@@ -14,7 +14,6 @@ import { TeamsModule } from '../teams/teams.module';
 import { ContributionsController } from './contributions.controller';
 import { ContributionsService } from './contributions.service';
 import { ContributionClient } from './contribution.client';
-import { LocalContributionScorer } from './contribution.scorer';
 
 @Module({
   imports: [
@@ -33,11 +32,7 @@ import { LocalContributionScorer } from './contribution.scorer';
     TeamsModule,
   ],
   controllers: [ContributionsController],
-  providers: [
-    ContributionsService,
-    ContributionClient,
-    LocalContributionScorer,
-  ],
+  providers: [ContributionsService, ContributionClient],
   exports: [ContributionsService],
 })
 export class ContributionsModule {}

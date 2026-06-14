@@ -16,7 +16,6 @@ import {
 import { User } from '../entities/user.entity';
 import { TeamsService } from '../teams/teams.service';
 import { ContributionClient } from './contribution.client';
-import { LocalContributionScorer } from './contribution.scorer';
 import { TeamPipelineRequest, TeamSettingsPayload } from './contribution.types';
 
 @Injectable()
@@ -44,7 +43,6 @@ export class ContributionsService {
     private userRepo: Repository<User>,
     private teamsService: TeamsService,
     private client: ContributionClient,
-    private scorer: LocalContributionScorer,
   ) {}
 
   // 회의 종료 시 호출 — 외부 서버에서 트랙1(①) 계산 후 우리 DB에 저장
@@ -112,12 +110,10 @@ export class ContributionsService {
       })),
     };
 
-    // 외부 산정 서버가 설정돼 있으면 위임, 아니면 서버 내 로컬 스코어러(docs/06)로 계산
-    const response = this.client.configured
-      ? await this.client.computeMeetingScores(payload)
-      : this.scorer.computeMeetingScores(payload);
+    // 외부 산정 엔진(cc-team-8/Contribution)에 위임 — CONTRIBUTION_SERVICE_URL 필수
+    const response = await this.client.computeMeetingScores(payload);
 
-    if (!response) return []; // 외부 서버 설정됐으나 응답 없음 — 저장 건너뜀
+    if (!response) return []; // 엔진 미설정·무응답 — 저장 건너뜀
 
     const saved: ContributionScore[] = [];
     for (const r of response.scores) {
@@ -233,20 +229,17 @@ export class ContributionsService {
       })),
     };
 
-    // 외부 산정 서버 설정 시 기존 calculate 계약(/pipeline/score)으로 위임 — pipeline 은
-    // 저장된 ① 점수를 받지 못하므로 회의별 원시 이벤트를 다시 모아 보낸다.
-    // 미설정이면 로컬 스코어러(docs/06)가 저장된 ①(teamPayload) 기반으로 동적 계산.
-    const response = this.client.configured
-      ? await this.client.computeTeamContributions(
-          await this.buildPipelinePayload(
-            teamId,
-            settings,
-            teamPayload,
-            meetings,
-            memberships.filter((m) => !m.deleted_at).map((m) => m.user_id),
-          ),
-        )
-      : this.scorer.computeTeamContributions(teamPayload);
+    // 외부 산정 엔진의 /pipeline/score 에 위임 — pipeline 은 저장된 ① 점수를 받지 못하므로
+    // 회의별 원시 이벤트를 다시 모아 보낸다. (CONTRIBUTION_SERVICE_URL 필수)
+    const response = await this.client.computeTeamContributions(
+      await this.buildPipelinePayload(
+        teamId,
+        settings,
+        teamPayload,
+        meetings,
+        memberships.filter((m) => !m.deleted_at).map((m) => m.user_id),
+      ),
+    );
 
     const names = await this.userNames(memberIds);
     const roleById = new Map(members.map((m) => [m.user_id, m.role]));
