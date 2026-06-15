@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import { getUser } from "@/lib/auth";
 import { apiFetch, authHeader } from "@/lib/apiFetch";
 import { apiGet } from "@/lib/api";
+import { createCompanionChannel } from "@/lib/companion";
 import type {
   ActionItem,
   Meeting,
@@ -94,6 +95,15 @@ export default function DashboardPage() {
       if (ext.status === "fulfilled") setHasExtensionTodo(ext.value.length > 0);
     });
   }, [teamId]);
+
+  useEffect(() => {
+    const ch = createCompanionChannel();
+    ch.onmessage = (e: MessageEvent) => {
+      const msg = e.data as { type?: string };
+      if (msg.type === "meeting:ended") setHasLive(false);
+    };
+    return () => ch.close();
+  }, []);
 
   const badgeFor = (key: string): { text: string; live: boolean } | null => {
     if (key === "meeting" && hasLive) return { text: "LIVE", live: true };
