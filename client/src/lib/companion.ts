@@ -1,7 +1,7 @@
-// 회의 중 보조 창(별도 브라우저 창, 폭 400px) 제어 + 메인 탭과의 상태 공유.
+// 회의 중 보조 창(별도 브라우저 창) 제어 + 메인 탭과의 상태 공유.
 // always-on-top 은 V2(데스크탑). MVP 는 window.open. (docs/01·02·11)
 
-const COMPANION_HEIGHT = 820;
+const COMPANION_WIDTH = 420;
 const POSITION_KEY = "companion_window_position";
 
 interface CompanionPosition {
@@ -34,10 +34,9 @@ export function openCompanion(
     return null;
   }
   const pos = loadPosition();
-  const w = Math.round(window.screen.availWidth * 0.8);
   const features = [
-    `width=${w}`,
-    `height=${COMPANION_HEIGHT}`,
+    `width=${COMPANION_WIDTH}`,
+    `height=${window.screen.availHeight}`,
     pos ? `left=${pos.left}` : "",
     pos ? `top=${pos.top}` : "",
     "menubar=no",
