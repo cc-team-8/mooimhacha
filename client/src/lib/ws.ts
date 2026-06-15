@@ -34,7 +34,7 @@ function getTokenExpMs(token: string): number | null {
 
 export function connectMeetingSocket(): Socket {
   const socket = io(WS_BASE, {
-    transports: ["websocket"],
+    transports: ["polling", "websocket"],
     // 함수형 auth — 재연결 시점의 최신 토큰 사용 (정적 객체는 생성 시점 토큰에 고착됨).
     // cb 호출 전까지 CONNECT 패킷이 보류되므로, 만료 임박이면 tryRefresh 를 먼저 끝낸다.
     auth: (cb) => {
