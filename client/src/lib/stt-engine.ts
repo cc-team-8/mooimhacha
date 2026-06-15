@@ -30,6 +30,7 @@ class WebSttEngine implements SttEngine {
     // (Web Speech 래퍼는 interimResults=false 라 onPartial 은 발생하지 않음.)
     this.controller = createSpeechRecognizer({
       onFinal: h.onFinal,
+      onPartial: h.onPartial,
       onFailure: h.onFailure,
       onSpeechStart: h.onSpeechStart,
       onSpeechEnd: h.onSpeechEnd,
@@ -56,9 +57,7 @@ class LocalSttEngine implements SttEngine {
 
     const { stt } = bridge;
     // partial: 화면 미리보기용(선택).
-    this.unsubscribers.push(
-      stt.onPartial((e) => h.onPartial?.(e.text)),
-    );
+    this.unsubscribers.push(stt.onPartial((e) => h.onPartial?.(e.text)));
     // final: 확정 발화. 로컬 추론은 confidence 를 제공하지 않으므로 null.
     this.unsubscribers.push(
       stt.onFinal((e) => {

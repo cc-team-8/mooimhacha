@@ -386,6 +386,17 @@ body {
   font-size: 12px;
   text-align: center;
 }
+/* 실시간 발화 미리보기 */
+.cmp-partial-text {
+  margin: 6px 10px 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border-radius: 8px;
+  font-size: 13px;
+  font-style: italic;
+  border-left: 3px solid var(--green);
+}
 /* 연결 끊김 / 마이크 오류 (경고색) */
 .cmp-conn-banner,
 .cmp-mic-banner {

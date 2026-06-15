@@ -54,6 +54,7 @@ export function isSpeechSupported(): boolean {
 export interface SpeechCallbacks {
   // 확정 발화 1건
   onFinal: (text: string, confidence: number | null) => void;
+  onPartial?: (text: string) => void;
   onSpeechStart?: () => void;
   onSpeechEnd?: () => void;
   // STT 실패(network/no-speech/aborted 등) — anomaly_events.stt_failure 기록용
@@ -76,7 +77,7 @@ export function createSpeechRecognizer(
   const recognition = new Ctor();
   recognition.lang = cb.lang ?? "ko-KR";
   recognition.continuous = true;
-  recognition.interimResults = false; // isFinal 만 사용
+  recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
   let running = false;
@@ -87,7 +88,10 @@ export function createSpeechRecognizer(
   recognition.onresult = (e) => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const result = e.results[i];
-      if (!result.isFinal) continue;
+      if (!result.isFinal) {
+        cb.onPartial?.(result[0].transcript);
+        continue;
+      }
       const alt = result[0];
       const text = alt.transcript.trim();
       if (!text) continue;
@@ -117,7 +121,10 @@ export function createSpeechRecognizer(
     }
     // network — 지수 백오프 후 재시도
     if (e.error === "network") {
-      networkBackoffMs = Math.min(networkBackoffMs ? networkBackoffMs * 2 : 1000, 15000);
+      networkBackoffMs = Math.min(
+        networkBackoffMs ? networkBackoffMs * 2 : 1000,
+        15000,
+      );
       cb.onFailure?.("network");
       return;
     }

@@ -68,6 +68,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
   const [connLost, setConnLost] = useState(false);
   const [ending, setEnding] = useState(false);
   const [speakingSelf, setSpeakingSelf] = useState(false);
+  const [partialText, setPartialText] = useState("");
 
   const socketRef = useRef<Socket | null>(null);
   const engineRef = useRef<SttEngine | null>(null);
@@ -81,7 +82,12 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
   const lastSpokeRef = useRef<number>(Date.now());
   // t0 미수신 상태에서 확정된 발화는 절대시각으로 버퍼링했다가 t0 도착 시 flush
   const pendingRef = useRef<
-    { text: string; confidence: number | null; startAbs: number; endAbs: number }[]
+    {
+      text: string;
+      confidence: number | null;
+      startAbs: number;
+      endAbs: number;
+    }[]
   >([]);
 
   // 매초 갱신 (시간 초과 시각화용)
@@ -351,6 +357,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
       const s = socketRef.current;
       if (s) speakingEnd(s, meetingId);
       setSpeakingSelf(false);
+      setPartialText("");
       setMicOn(false);
       return;
     }
@@ -396,7 +403,9 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
         const s = socketRef.current;
         if (s) speakingEnd(s, meetingId);
       },
+      onPartial: (text) => setPartialText(text),
       onFinal: (text, confidence) => {
+        setPartialText("");
         setSttIssue(null);
         sendUtteranceNow(text, confidence);
       },
@@ -448,7 +457,9 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
       agenda_id: id,
       activate: true,
     }).catch(() => {
-      setWsIssue("안건 상태 변경이 확인되지 않았어요. 잠시 후 다시 시도해 주세요.");
+      setWsIssue(
+        "안건 상태 변경이 확인되지 않았어요. 잠시 후 다시 시도해 주세요.",
+      );
     });
   };
   // 완료 = 자동 스위칭: 완료 ack 후 목록 순서상 첫 대기 안건을 이어서 시작한다.
@@ -475,7 +486,9 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
         });
       })
       .catch(() => {
-        setWsIssue("안건 상태 변경이 확인되지 않았어요. 잠시 후 다시 시도해 주세요.");
+        setWsIssue(
+          "안건 상태 변경이 확인되지 않았어요. 잠시 후 다시 시도해 주세요.",
+        );
       });
   };
   const handleAddAgenda = async (title: string) => {
@@ -500,7 +513,9 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
       return true;
     } catch {
       lateArrivalRef.current = { kind: "decision", text: content };
-      setWsIssue("결정사항 저장이 확인되지 않았어요. 입력을 복원했어요 — 다시 시도해 주세요.");
+      setWsIssue(
+        "결정사항 저장이 확인되지 않았어요. 입력을 복원했어요 — 다시 시도해 주세요.",
+      );
       return false;
     }
   };
@@ -513,11 +528,17 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
     const s = socketRef.current;
     if (!s) return false;
     try {
-      await addAction(s, { meeting_id: meetingId, team_id: teamId, ...payload });
+      await addAction(s, {
+        meeting_id: meetingId,
+        team_id: teamId,
+        ...payload,
+      });
       return true;
     } catch {
       lateArrivalRef.current = { kind: "action", text: payload.description };
-      setWsIssue("액션 저장이 확인되지 않았어요. 입력을 복원했어요 — 다시 시도해 주세요.");
+      setWsIssue(
+        "액션 저장이 확인되지 않았어요. 입력을 복원했어요 — 다시 시도해 주세요.",
+      );
       return false;
     }
   };
@@ -525,7 +546,9 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
   const handleEnd = async () => {
     if (ending) return;
     if (
-      !confirm("회의를 종료하면 다시 시작할 수 없어요. 지금 기여도를 확정할까요?")
+      !confirm(
+        "회의를 종료하면 다시 시작할 수 없어요. 지금 기여도를 확정할까요?",
+      )
     )
       return;
     setEnding(true);
@@ -560,8 +583,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
     );
   }
 
-  const elapsedMin =
-    t0ms !== null ? Math.floor((now - t0ms) / 60000) : 0;
+  const elapsedMin = t0ms !== null ? Math.floor((now - t0ms) / 60000) : 0;
   const recentDecisions = decisions.slice(-3).reverse();
   const recentActions = actions.slice(-3).reverse();
 
@@ -583,11 +605,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
           >
             {micOn ? "🔴 듣는 중" : "🎙 마이크 켜기"}
           </button>
-          <button
-            className="cmp-end-btn"
-            onClick={handleEnd}
-            disabled={ending}
-          >
+          <button className="cmp-end-btn" onClick={handleEnd} disabled={ending}>
             {ending ? "종료 중…" : "회의 종료"}
           </button>
         </div>
@@ -640,6 +658,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
             : "🎙 마이크 켜짐 · 발언을 기다리는 중"}
         </div>
       )}
+      {partialText && <div className="cmp-partial-text">{partialText}</div>}
       {silentHint && (
         <div className="cmp-silent-hint">
           🔇 한동안 발언이 없어요. 의견을 나눠보세요.
