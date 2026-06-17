@@ -353,17 +353,6 @@ export default function HomePage() {
                 <div className="nd-divider" />
                 {todos.length > 0 && (
                   <>
-                    <div
-                      style={{
-                        padding: "8px 14px 4px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "var(--text-soft)",
-                        letterSpacing: ".04em",
-                      }}
-                    >
-                      처리할 일
-                    </div>
                     {todos.map((item, i) => (
                       <div
                         key={i}
