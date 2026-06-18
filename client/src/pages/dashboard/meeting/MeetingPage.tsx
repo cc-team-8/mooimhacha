@@ -1223,21 +1223,17 @@ export default function MeetingPage() {
                                         {speaker?.name ?? `사용자 ${g.user_id}`}
                                         <span className="utt-time">
                                           {selected.t0_timestamp
-                                            ? new Date(
-                                                new Date(
-                                                  selected.t0_timestamp,
-                                                ).getTime() +
-                                                  g.started_at_offset_ms,
-                                              ).toLocaleTimeString("ko-KR", {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                                second: "2-digit",
-                                              })
-                                            : fmt(
-                                                Math.floor(
-                                                  g.started_at_offset_ms / 1000,
-                                                ),
-                                              )}
+                                            ? (() => {
+                                                const t0 = new Date(selected.t0_timestamp).getTime();
+                                                const tf = (offset: number) =>
+                                                  new Date(t0 + offset).toLocaleTimeString("ko-KR", {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                    second: "2-digit",
+                                                  });
+                                                return `${tf(g.started_at_offset_ms)} ~ ${tf(g.ended_at_offset_ms)}`;
+                                              })()
+                                            : `${fmt(Math.floor(g.started_at_offset_ms / 1000))} ~ ${fmt(Math.floor(g.ended_at_offset_ms / 1000))}`}
                                         </span>
                                       </span>
                                       <span className="utt-text">{g.text}</span>
