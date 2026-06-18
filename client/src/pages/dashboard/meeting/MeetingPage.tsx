@@ -22,8 +22,15 @@ import type {
   TeamSettings,
 } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
+import { todayStr, nowTimeStr, timeMinForDate } from "@/lib/dateUtils";
 
-type Tab = "agenda" | "speak" | "attendance" | "decision" | "summary" | "settings";
+type Tab =
+  | "agenda"
+  | "speak"
+  | "attendance"
+  | "decision"
+  | "summary"
+  | "settings";
 type Status = "할 일" | "진행 중" | "완료";
 
 const STATUS_TO_API: Record<Status, string> = {
@@ -132,8 +139,8 @@ export default function MeetingPage() {
   const [confirmTask, setConfirmTask] = useState<ActionItem | null>(null);
   const [confirmDesc, setConfirmDesc] = useState("");
   const [confirmAssignee, setConfirmAssignee] = useState("");
-  const [confirmDue, setConfirmDue] = useState("");
-  const [confirmTime, setConfirmTime] = useState("");
+  const [confirmDue, setConfirmDue] = useState(todayStr());
+  const [confirmTime, setConfirmTime] = useState(nowTimeStr());
   const [confirmStatus, setConfirmStatus] = useState<Status>("할 일");
   const [confirmDifficulty, setConfirmDifficulty] = useState(2);
   const [confirmSaving, setConfirmSaving] = useState(false);
@@ -147,15 +154,17 @@ export default function MeetingPage() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editMinutes, setEditMinutes] = useState<number | "">(30);
-  const [editMeetingType, setEditMeetingType] = useState<"regular" | "partial">("regular");
+  const [editMeetingType, setEditMeetingType] = useState<"regular" | "partial">(
+    "regular",
+  );
   const [editSaving, setEditSaving] = useState(false);
   const [deletingMeeting, setDeletingMeeting] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [newMeetingType, setNewMeetingType] = useState<"regular" | "partial">(
     "regular",
   );
-  const [newDate, setNewDate] = useState("");
-  const [newTime, setNewTime] = useState("15:00");
+  const [newDate, setNewDate] = useState(todayStr());
+  const [newTime, setNewTime] = useState(nowTimeStr());
   // 입력 중 빈 값을 허용하기 위해 ""도 담는다 — 제출 시 기본값으로 보정
   const [newMinutes, setNewMinutes] = useState<number | "">(30);
   // 아젠다를 한 항목씩 추가 — 예상 시간(minutes)은 선택
@@ -231,7 +240,11 @@ export default function MeetingPage() {
       const d = new Date(selected.scheduled_at);
       setEditDate(d.toLocaleDateString("sv-SE"));
       setEditTime(
-        d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+        d.toLocaleTimeString("ko-KR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
       );
       setEditMinutes(selected.total_minutes ?? 30);
       setEditMeetingType(selected.meeting_type ?? "regular");
@@ -240,6 +253,14 @@ export default function MeetingPage() {
 
   async function saveMeetingSettings() {
     if (!selectedId || editSaving) return;
+    if (!editDate || !editTime) {
+      showToast("날짜와 시간을 입력해 주세요", "error");
+      return;
+    }
+    if (new Date(`${editDate}T${editTime}:00`) <= new Date()) {
+      showToast("현재 시각 이후로 설정해 주세요", "error");
+      return;
+    }
     setEditSaving(true);
     try {
       await apiPatch(`/meetings/${selectedId}`, {
@@ -629,6 +650,14 @@ export default function MeetingPage() {
       showToast("날짜를 선택해 주세요", "error");
       return;
     }
+    if (!newTime) {
+      showToast("시간을 입력해 주세요", "error");
+      return;
+    }
+    if (new Date(`${newDate}T${newTime}:00`) <= new Date()) {
+      showToast("현재 시각 이후로 설정해 주세요", "error");
+      return;
+    }
     if (!newMinutes) {
       showToast("예상 소요 시간을 입력해 주세요", "error");
       return;
@@ -652,7 +681,8 @@ export default function MeetingPage() {
       setModalOpen(null);
       setNewTopic("");
       setNewMeetingType("regular");
-      setNewDate("");
+      setNewDate(todayStr());
+      setNewTime(nowTimeStr());
       setNewAgendaList([]);
       setNewAgendaInput("");
       setNewAgendaMinutes("");
@@ -1282,13 +1312,20 @@ export default function MeetingPage() {
                                         <span className="utt-time">
                                           {selected.t0_timestamp
                                             ? (() => {
-                                                const t0 = new Date(selected.t0_timestamp).getTime();
+                                                const t0 = new Date(
+                                                  selected.t0_timestamp,
+                                                ).getTime();
                                                 const tf = (offset: number) =>
-                                                  new Date(t0 + offset).toLocaleTimeString("ko-KR", {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                    second: "2-digit",
-                                                  });
+                                                  new Date(
+                                                    t0 + offset,
+                                                  ).toLocaleTimeString(
+                                                    "ko-KR",
+                                                    {
+                                                      hour: "2-digit",
+                                                      minute: "2-digit",
+                                                      second: "2-digit",
+                                                    },
+                                                  );
                                                 return `${tf(g.started_at_offset_ms)} ~ ${tf(g.ended_at_offset_ms)}`;
                                               })()
                                             : `${fmt(Math.floor(g.started_at_offset_ms / 1000))} ~ ${fmt(Math.floor(g.ended_at_offset_ms / 1000))}`}
@@ -1512,8 +1549,8 @@ export default function MeetingPage() {
                     {selected.status !== "ended" ? (
                       <div className="summary-box">
                         <i className="ti ti-sparkles" />
-                        회의가 종료되면 AI가 자동으로
-                        결정 사항·태스크·회의록을 요약합니다.
+                        회의가 종료되면 AI가 자동으로 결정 사항·태스크·회의록을
+                        요약합니다.
                       </div>
                     ) : (
                       <>
@@ -1544,8 +1581,8 @@ export default function MeetingPage() {
                                       setConfirmTask(task);
                                       setConfirmDesc(task.description);
                                       setConfirmAssignee("");
-                                      setConfirmDue("");
-                                      setConfirmTime("");
+                                      setConfirmDue(todayStr());
+                                      setConfirmTime(nowTimeStr());
                                       setConfirmStatus("할 일");
                                       setConfirmDifficulty(2);
                                     }}
@@ -1690,6 +1727,7 @@ export default function MeetingPage() {
                         <input
                           className="input"
                           type="date"
+                          min={todayStr()}
                           value={editDate}
                           disabled={selected.status === "ended"}
                           onChange={(e) => setEditDate(e.target.value)}
@@ -1700,6 +1738,7 @@ export default function MeetingPage() {
                         <input
                           className="input"
                           type="time"
+                          min={timeMinForDate(editDate)}
                           value={editTime}
                           disabled={selected.status === "ended"}
                           onChange={(e) => setEditTime(e.target.value)}
@@ -1735,8 +1774,19 @@ export default function MeetingPage() {
                     >
                       {editSaving ? "저장 중…" : "저장"}
                     </button>
-                    <div style={{ marginTop: 32, borderTop: "1px solid var(--border-2)", paddingTop: 16 }}>
-                      <div className="panel-label" style={{ color: "var(--coral)" }}>위험 구역</div>
+                    <div
+                      style={{
+                        marginTop: 32,
+                        borderTop: "1px solid var(--border-2)",
+                        paddingTop: 16,
+                      }}
+                    >
+                      <div
+                        className="panel-label"
+                        style={{ color: "var(--coral)" }}
+                      >
+                        위험 구역
+                      </div>
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => setDeletingMeeting(true)}
@@ -1820,7 +1870,7 @@ export default function MeetingPage() {
               <input
                 className="input"
                 type="date"
-                min={new Date().toLocaleDateString("sv-SE")}
+                min={todayStr()}
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
               />
@@ -1830,6 +1880,7 @@ export default function MeetingPage() {
               <input
                 className="input"
                 type="time"
+                min={timeMinForDate(newDate)}
                 value={newTime}
                 onChange={(e) => setNewTime(e.target.value)}
               />
@@ -2056,10 +2107,19 @@ export default function MeetingPage() {
       {deletingMeeting && (
         <Modal
           title="회의 삭제"
-          onClose={() => { setDeletingMeeting(false); setDeleteConfirmInput(""); }}
+          onClose={() => {
+            setDeletingMeeting(false);
+            setDeleteConfirmInput("");
+          }}
           actions={
             <>
-              <button className="btn" onClick={() => { setDeletingMeeting(false); setDeleteConfirmInput(""); }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setDeletingMeeting(false);
+                  setDeleteConfirmInput("");
+                }}
+              >
                 취소
               </button>
               <button
@@ -2143,7 +2203,7 @@ export default function MeetingPage() {
                   className="input"
                   type="date"
                   style={{ flex: 2 }}
-                  min={new Date().toLocaleDateString("sv-SE")}
+                  min={todayStr()}
                   value={confirmDue}
                   onChange={(e) => setConfirmDue(e.target.value)}
                 />
@@ -2152,6 +2212,7 @@ export default function MeetingPage() {
                   type="time"
                   style={{ flex: 1 }}
                   placeholder="23:59"
+                  min={timeMinForDate(confirmDue)}
                   value={confirmTime}
                   onChange={(e) => setConfirmTime(e.target.value)}
                 />

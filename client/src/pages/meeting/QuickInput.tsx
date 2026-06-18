@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TeamMember } from "@/lib/types";
+import { todayStr } from "@/lib/dateUtils";
 
 // 결정 사항·액션 빠른 입력. 단축키 Ctrl/Cmd+D(결정)·Ctrl/Cmd+A(액션).
 // 입력된 항목은 현재 진행 중 아젠다에 서버가 자동 연결.
@@ -20,7 +21,7 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
   const [decision, setDecision] = useState("");
   const [actionDesc, setActionDesc] = useState("");
   const [assignee, setAssignee] = useState<string>("");
-  const [due, setDue] = useState("");
+  const [due, setDue] = useState(todayStr());
   const [forNext, setForNext] = useState(false);
 
   const decisionRef = useRef<HTMLInputElement>(null);
@@ -126,6 +127,7 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
               </select>
               <input
                 type="date"
+                min={todayStr()}
                 value={due}
                 onChange={(e) => setDue(e.target.value)}
               />

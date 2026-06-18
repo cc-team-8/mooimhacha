@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
+import {
+  todayStr,
+  nowTimeStr,
+  nowDateTimeStr,
+  timeMinForDate,
+} from "@/lib/dateUtils";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -103,8 +109,8 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [newDesc, setNewDesc] = useState("");
   const [newAssignee, setNewAssignee] = useState<string>("");
-  const [newDue, setNewDue] = useState("");
-  const [newTime, setNewTime] = useState("");
+  const [newDue, setNewDue] = useState(todayStr());
+  const [newTime, setNewTime] = useState(nowTimeStr());
   const [newStatus, setNewStatus] = useState<Status>("할 일");
   const [newDifficulty, setNewDifficulty] = useState(2);
 
@@ -542,6 +548,12 @@ export default function TasksPage() {
       showToast("태스크 이름을 입력해 주세요", "error");
       return;
     }
+    if (newDue && newTime) {
+      if (new Date(`${newDue}T${newTime}`) <= new Date()) {
+        showToast("현재 시각 이후로 설정해 주세요", "error");
+        return;
+      }
+    }
     setSaving(true);
     try {
       await apiPost("/action-items", {
@@ -557,8 +569,8 @@ export default function TasksPage() {
       setModalOpen(false);
       setNewDesc("");
       setNewAssignee("");
-      setNewDue("");
-      setNewTime("");
+      setNewDue(todayStr());
+      setNewTime(nowTimeStr());
       setNewStatus("할 일");
       setNewDifficulty(2);
       showToast("태스크가 추가되었습니다");
@@ -777,11 +789,23 @@ export default function TasksPage() {
                             >
                               <i className="ti ti-check" />
                               {fmtCompleted(t.completed_at)} 완료
-                              {t.due_date && new Date(t.completed_at) > new Date(t.due_date) && (
-                                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: "var(--coral)", background: "var(--coral-soft)", borderRadius: 4, padding: "1px 5px" }}>
-                                  기한 초과
-                                </span>
-                              )}
+                              {t.due_date &&
+                                new Date(t.completed_at) >
+                                  new Date(t.due_date) && (
+                                  <span
+                                    style={{
+                                      marginLeft: 4,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "var(--coral)",
+                                      background: "var(--coral-soft)",
+                                      borderRadius: 4,
+                                      padding: "1px 5px",
+                                    }}
+                                  >
+                                    기한 초과
+                                  </span>
+                                )}
                             </div>
                           )}
                         </div>
@@ -870,11 +894,22 @@ export default function TasksPage() {
                       >
                         <i className="ti ti-check" style={{ marginRight: 3 }} />
                         {fmtCompleted(t.completed_at)} 완료
-                        {t.due_date && new Date(t.completed_at) > new Date(t.due_date) && (
-                          <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: "var(--coral)", background: "var(--coral-soft)", borderRadius: 4, padding: "1px 5px" }}>
-                            기한 초과
-                          </span>
-                        )}
+                        {t.due_date &&
+                          new Date(t.completed_at) > new Date(t.due_date) && (
+                            <span
+                              style={{
+                                marginLeft: 4,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "var(--coral)",
+                                background: "var(--coral-soft)",
+                                borderRadius: 4,
+                                padding: "1px 5px",
+                              }}
+                            >
+                              기한 초과
+                            </span>
+                          )}
                       </div>
                     )}
                   </div>
@@ -956,7 +991,7 @@ export default function TasksPage() {
                   className="input"
                   type="date"
                   style={{ flex: 2 }}
-                  min={new Date().toLocaleDateString("sv-SE")}
+                  min={todayStr()}
                   value={newDue}
                   onChange={(e) => setNewDue(e.target.value)}
                 />
@@ -965,6 +1000,7 @@ export default function TasksPage() {
                   type="time"
                   style={{ flex: 1 }}
                   placeholder="23:59"
+                  min={timeMinForDate(newDue)}
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
                 />
@@ -1282,6 +1318,7 @@ export default function TasksPage() {
             <input
               className="input"
               type="datetime-local"
+              min={nowDateTimeStr()}
               value={extDue}
               onChange={(e) => setExtDue(e.target.value)}
             />
