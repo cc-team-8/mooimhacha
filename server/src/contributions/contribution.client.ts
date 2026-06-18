@@ -71,7 +71,11 @@ export class ContributionClient {
             data.meeting_total_sec > 0
               ? data.actual_attend_sec / data.meeting_total_sec
               : null,
-          punctuality_score: null,
+          punctuality_score: data.absent
+            ? null
+            : data.late_sec > 300
+              ? 0.0
+              : 1.0,
           // 포함 0건(최소시간 미만 등) = 측정 불가 → null.
           // 무단 결석은 엔진이 0점으로 포함시키므로 0 이 저장된다.
           meeting_score:

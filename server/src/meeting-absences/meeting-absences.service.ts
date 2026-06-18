@@ -68,15 +68,28 @@ export class MeetingAbsencesService {
       members: members.map((m) => {
         const score = scoreByUser.get(m.user_id);
         const absence = absenceByUser.get(m.user_id);
-        const status = this.deriveStatus(joined.has(m.user_id), score, absence);
+        const lateByPresence = this.isLateByPresence(
+          meeting,
+          presence,
+          m.user_id,
+        );
+        const status = this.deriveStatus(
+          joined.has(m.user_id),
+          score,
+          absence,
+          lateByPresence,
+        );
         const aid = absence ? Number(absence.id) : null;
         return {
           user_id: m.user_id,
           name: m.name,
           profile_image_url: m.profile_image_url,
           status,
+          joined_at: this.joinedAt(meeting, presence, m.user_id),
           late_minutes:
-            status === 'late' ? this.lateMinutes(presence, m.user_id) : null,
+            status === 'late'
+              ? this.lateMinutes(meeting, presence, m.user_id)
+              : null,
           absence: absence
             ? {
                 id: Number(absence.id),
@@ -137,10 +150,19 @@ export class MeetingAbsencesService {
       const myAbsence = absences.find(
         (a) => Number(a.meeting_id) === mid && Number(a.user_id) === userId,
       );
+      const myPresenceForMeeting = myPresence.filter(
+        (p) => Number(p.meeting_id) === mid,
+      );
+      const lateByPresence = this.isLateByPresence(
+        m,
+        myPresenceForMeeting,
+        userId,
+      );
       const status = this.deriveStatus(
         myJoined.has(mid),
         myScoreByMeeting.get(mid),
         myAbsence,
+        lateByPresence,
       );
       // 내가 처리(동의)해야 할 미처리 결석 사유 — pending · 본인 것 아님 · 아직 미동의
       const pendingCount = absences.filter(
@@ -314,16 +336,39 @@ export class MeetingAbsencesService {
     hasJoined: boolean,
     score: ContributionScore | undefined,
     absence: MeetingAbsence | undefined,
+    lateByPresence = false,
   ): AttendanceStatus {
-    // 결석 = 입장 기록 없음 (산정의 absent 정의와 일치, 산정 경로 무관하게 견고)
     if (!hasJoined) {
       return absence?.status === 'approved' ? 'excused' : 'absent';
     }
-    // 지각 = 정시성 점수 미달 (외부 엔진 경로는 punctuality 미제공 → null 이면 출석 처리)
-    if (score?.punctuality_score != null && score.punctuality_score < 1) {
-      return 'late';
-    }
+    if (lateByPresence) return 'late';
     return 'present';
+  }
+
+  // 예정 시간 대비 5분 초과 입장 여부를 presence 이벤트로 직접 판정
+  private isLateByPresence(
+    meeting: Meeting,
+    presence: PresenceEvent[],
+    userId: number,
+  ): boolean {
+    if (!meeting.t0_timestamp) return false;
+    const joins = presence
+      .filter(
+        (p) =>
+          Number(p.user_id) === userId &&
+          (p.event_type === 'join' || p.event_type === 'reconnect'),
+      )
+      .map((p) => p.timestamp_offset_ms);
+    if (joins.length === 0) return false;
+    const firstOffset = Math.min(...joins);
+    const lateSec =
+      Math.max(
+        0,
+        meeting.t0_timestamp.getTime() -
+          meeting.scheduled_at.getTime() +
+          firstOffset,
+      ) / 1000;
+    return lateSec > 300;
   }
 
   // 그 회의에 입장(join/reconnect) 기록이 있는 user 집합
@@ -347,11 +392,13 @@ export class MeetingAbsencesService {
     return !!join;
   }
 
-  // 지각 분 — 첫 입장 오프셋(산정 로직과 동일하게 max(0, …))
-  private lateMinutes(
+  // 실제 입장 시각 (ISO string) — t0 + 첫 입장 오프셋
+  private joinedAt(
+    meeting: Meeting,
     presence: PresenceEvent[],
     userId: number,
-  ): number | null {
+  ): string | null {
+    if (!meeting.t0_timestamp) return null;
     const joins = presence
       .filter(
         (p) =>
@@ -361,7 +408,32 @@ export class MeetingAbsencesService {
       .map((p) => p.timestamp_offset_ms);
     if (joins.length === 0) return null;
     const firstOffset = Math.min(...joins);
-    return Math.round(Math.max(0, firstOffset) / 60000);
+    return new Date(meeting.t0_timestamp.getTime() + firstOffset).toISOString();
+  }
+
+  // 지각 분 — 예정 시간 대비 첫 입장까지 경과 분
+  private lateMinutes(
+    meeting: Meeting,
+    presence: PresenceEvent[],
+    userId: number,
+  ): number | null {
+    if (!meeting.t0_timestamp) return null;
+    const joins = presence
+      .filter(
+        (p) =>
+          Number(p.user_id) === userId &&
+          (p.event_type === 'join' || p.event_type === 'reconnect'),
+      )
+      .map((p) => p.timestamp_offset_ms);
+    if (joins.length === 0) return null;
+    const firstOffset = Math.min(...joins);
+    const lateMs = Math.max(
+      0,
+      meeting.t0_timestamp.getTime() -
+        meeting.scheduled_at.getTime() +
+        firstOffset,
+    );
+    return Math.round(lateMs / 60000);
   }
 
   private async requireMeeting(meetingId: number): Promise<Meeting> {

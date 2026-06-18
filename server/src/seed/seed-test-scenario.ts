@@ -188,6 +188,7 @@ async function seed() {
         meeting: {
           id: mtg,
           total_minutes: 60,
+          scheduled_at: dt(-4, 14),
           t0_timestamp: dt(-4, 14),
           ended_at: dt(-4, 15),
           meeting_type: 'regular',

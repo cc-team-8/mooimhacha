@@ -117,6 +117,7 @@ export interface AttendanceMember {
   name: string;
   profile_image_url: string | null;
   status: AttendanceStatus;
+  joined_at: string | null;
   late_minutes: number | null;
   absence: {
     id: number;

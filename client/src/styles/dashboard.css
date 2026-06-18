@@ -751,6 +751,11 @@
   border-radius: 999px;
   flex: 0 0 auto;
 }
+.att-joined-at {
+  font-size: 11px;
+  color: var(--text-soft);
+  flex: 0 0 auto;
+}
 .btn.btn-consented {
   background: var(--surface);
   color: var(--green);

@@ -84,6 +84,7 @@ export class ContributionsService {
       meeting: {
         id: meeting.id,
         total_minutes: meeting.total_minutes,
+        scheduled_at: meeting.scheduled_at.toISOString(),
         t0_timestamp: meeting.t0_timestamp?.toISOString() ?? null,
         ended_at: meeting.ended_at?.toISOString() ?? null,
         meeting_type: meeting.meeting_type,
@@ -344,6 +345,7 @@ export class ContributionsService {
           meeting: {
             id: m.id,
             total_minutes: m.total_minutes,
+            scheduled_at: m.scheduled_at.toISOString(),
             t0_timestamp: m.t0_timestamp?.toISOString() ?? null,
             ended_at: m.ended_at?.toISOString() ?? null,
             meeting_type: m.meeting_type,

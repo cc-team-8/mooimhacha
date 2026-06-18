@@ -199,9 +199,15 @@ export function deriveMemberData(
       actual_attend_sec: absent
         ? 0
         : Math.max(0, durationMs - voluntaryAwayMs) / 1000,
-      late_sec: firstJoin
-        ? Math.max(0, firstJoin.timestamp_offset_ms) / 1000
-        : 0,
+      late_sec:
+        firstJoin && req.meeting.t0_timestamp
+          ? Math.max(
+              0,
+              new Date(req.meeting.t0_timestamp).getTime() -
+                new Date(req.meeting.scheduled_at).getTime() +
+                firstJoin.timestamp_offset_ms,
+            ) / 1000
+          : 0,
       own_chars: ownChars,
       utterance_count: utterCount,
       total_chars_during: totalChars,

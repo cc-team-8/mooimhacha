@@ -70,23 +70,19 @@ function meetingMeta(
     d.toDateString() === today.toDateString()
       ? "오늘"
       : `${d.getMonth() + 1}월 ${d.getDate()}일`;
-  const time = d.toLocaleTimeString("ko-KR", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
   if (m.status === "ended" && m.t0_timestamp && m.ended_at) {
     const start = new Date(m.t0_timestamp);
     const end = new Date(m.ended_at);
-    const fmt = (d: Date) =>
-      `${d.getMonth() + 1}/${d.getDate()} ${d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+    const timeFmt = (t: Date) =>
+      t.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
     const sameDay = start.toDateString() === end.toDateString();
     const endStr = sameDay
-      ? end.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-      : fmt(end);
+      ? timeFmt(end)
+      : `${end.getMonth() + 1}/${end.getDate()} ${timeFmt(end)}`;
     const countStr = attendedCount !== undefined ? ` · ${attendedCount}명` : "";
-    return `${fmt(start)} ~ ${endStr}${countStr}`;
+    return `${day} · ${timeFmt(start)} ~ ${endStr}${countStr}`;
   }
-  return `${day} ${time} · ${memberCount}명`;
+  return `${day} · ${memberCount}명`;
 }
 
 export default function MeetingPage() {
@@ -1187,20 +1183,12 @@ export default function MeetingPage() {
                   <div className="tab-panel active">
                     <div className="panel-label">
                       출결 현황
-                      {(() => {
-                        const grace =
-                          teamSettings?.punctuality_grace_ratio ?? 0.1;
-                        const totalMin = selected.total_minutes;
-                        const graceMin = Math.round(totalMin * grace);
-                        return (
-                          <span
-                            className="info-tip"
-                            data-tip={`회의 시작 후 ${graceMin}분(총 ${totalMin}분의 ${Math.round(grace * 100)}%) 이내 입장 → 출석\n초과 입장 → 지각\n입장 기록 없음 → 결석`}
-                          >
-                            <i className="ti ti-info-circle" />
-                          </span>
-                        );
-                      })()}
+                      <span
+                        className="info-tip"
+                        data-tip={`회의 시작 후 5분 이내 입장 → 출석\n5분 초과 입장 → 지각\n입장 기록 없음 → 결석`}
+                      >
+                        <i className="ti ti-info-circle" />
+                      </span>
                     </div>
                     {selected.status !== "ended" ? (
                       <div className="summary-box">
@@ -1240,7 +1228,7 @@ export default function MeetingPage() {
                                   {badge.label}
                                   {mem.status === "late" &&
                                     mem.late_minutes != null &&
-                                    ` ${mem.late_minutes}분`}
+                                    ` +${mem.late_minutes}분 후 입장`}
                                 </span>
                               </div>
                               {/* 서브 행: 사유 + 액션 (결석·출석인정만) */}

@@ -11,6 +11,7 @@ export interface MeetingScoreRequest {
   meeting: {
     id: number;
     total_minutes: number;
+    scheduled_at: string;
     t0_timestamp: string | null;
     ended_at: string | null;
     meeting_type: string;
