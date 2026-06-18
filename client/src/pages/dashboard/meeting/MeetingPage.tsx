@@ -1820,6 +1820,7 @@ export default function MeetingPage() {
                   className="input"
                   type="date"
                   style={{ flex: 2 }}
+                  min={new Date().toLocaleDateString("sv-SE")}
                   value={confirmDue}
                   onChange={(e) => setConfirmDue(e.target.value)}
                 />
