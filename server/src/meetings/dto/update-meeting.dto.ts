@@ -32,4 +32,9 @@ export class UpdateMeetingDto {
   @IsOptional()
   @IsBoolean()
   is_invalidated?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  meeting_type?: 'regular' | 'partial';
 }

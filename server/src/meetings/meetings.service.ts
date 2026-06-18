@@ -107,6 +107,7 @@ export class MeetingsService {
     if (dto.total_minutes !== undefined)
       meeting.total_minutes = dto.total_minutes;
     if (dto.topic !== undefined) meeting.topic = dto.topic;
+    if (dto.meeting_type !== undefined) meeting.meeting_type = dto.meeting_type;
 
     // 무효 처리는 팀장만
     if (dto.is_invalidated !== undefined) {

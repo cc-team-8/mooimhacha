@@ -23,7 +23,7 @@ import type {
 } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
 
-type Tab = "agenda" | "speak" | "attendance" | "decision" | "summary";
+type Tab = "agenda" | "speak" | "attendance" | "decision" | "summary" | "settings";
 type Status = "할 일" | "진행 중" | "완료";
 
 const STATUS_TO_API: Record<Status, string> = {
@@ -142,6 +142,15 @@ export default function MeetingPage() {
 
   // 새 회의 모달 입력값
   const [newTopic, setNewTopic] = useState("");
+  // 회의 설정 탭
+  const [editTopic, setEditTopic] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("");
+  const [editMinutes, setEditMinutes] = useState<number | "">(30);
+  const [editMeetingType, setEditMeetingType] = useState<"regular" | "partial">("regular");
+  const [editSaving, setEditSaving] = useState(false);
+  const [deletingMeeting, setDeletingMeeting] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [newMeetingType, setNewMeetingType] = useState<"regular" | "partial">(
     "regular",
   );
@@ -214,6 +223,56 @@ export default function MeetingPage() {
       void loadPendingTasks();
     }
   }, [tab, selected?.status, loadPendingTasks]);
+
+  // 설정 탭 진입 시 현재 값으로 초기화
+  useEffect(() => {
+    if (tab === "settings" && selected) {
+      setEditTopic(selected.topic ?? "");
+      const d = new Date(selected.scheduled_at);
+      setEditDate(d.toLocaleDateString("sv-SE"));
+      setEditTime(
+        d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      );
+      setEditMinutes(selected.total_minutes ?? 30);
+      setEditMeetingType(selected.meeting_type ?? "regular");
+    }
+  }, [tab, selected?.id]);
+
+  async function saveMeetingSettings() {
+    if (!selectedId || editSaving) return;
+    setEditSaving(true);
+    try {
+      await apiPatch(`/meetings/${selectedId}`, {
+        topic: editTopic.trim() || undefined,
+        scheduled_at: new Date(`${editDate}T${editTime}:00`).toISOString(),
+        total_minutes: editMinutes || undefined,
+        meeting_type: editMeetingType,
+      });
+      await loadMeetings();
+      showToast("회의 정보가 수정되었습니다.");
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteMeeting() {
+    if (!selectedId || busy) return;
+    setBusy(true);
+    try {
+      await apiDelete(`/meetings/${selectedId}`);
+      setSelectedId(null);
+      setDeletingMeeting(false);
+      setDeleteConfirmInput("");
+      showToast("회의가 삭제되었습니다.");
+      await loadMeetings();
+    } catch (e) {
+      showToast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // 팀 멤버 목록 (확정 모달 담당자 선택용)
   useEffect(() => {
@@ -987,6 +1046,7 @@ export default function MeetingPage() {
                       "attendance",
                       "decision",
                       "summary",
+                      "settings",
                     ] as Tab[]
                   ).map((t) => (
                     <div
@@ -1001,6 +1061,7 @@ export default function MeetingPage() {
                           attendance: "출결",
                           decision: "결정 사항",
                           summary: "회의 요약",
+                          settings: "회의 설정",
                         }[t]
                       }
                     </div>
@@ -1588,6 +1649,103 @@ export default function MeetingPage() {
                     )}
                   </div>
                 )}
+
+                {/* 회의 설정 */}
+                {tab === "settings" && (
+                  <div className="tab-panel active">
+                    <div className="panel-label">회의 정보 수정</div>
+                    <div className="field">
+                      <label className="field-label">회의 이름</label>
+                      <input
+                        className="input"
+                        placeholder="예) 중간 점검 회의"
+                        value={editTopic}
+                        onChange={(e) => setEditTopic(e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="field-label">회의 유형</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className={`btn btn-sm${editMeetingType === "regular" ? " btn-primary" : ""}`}
+                          disabled={selected.status === "ended"}
+                          onClick={() => setEditMeetingType("regular")}
+                        >
+                          전체 회의
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm${editMeetingType === "partial" ? " btn-primary" : ""}`}
+                          disabled={selected.status === "ended"}
+                          onClick={() => setEditMeetingType("partial")}
+                        >
+                          부분 회의
+                        </button>
+                      </div>
+                    </div>
+                    <div className="field-row">
+                      <div className="field">
+                        <label className="field-label">날짜</label>
+                        <input
+                          className="input"
+                          type="date"
+                          value={editDate}
+                          disabled={selected.status === "ended"}
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="field-label">시간</label>
+                        <input
+                          className="input"
+                          type="time"
+                          value={editTime}
+                          disabled={selected.status === "ended"}
+                          onChange={(e) => setEditTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label className="field-label">예상 소요 시간 (분)</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min={1}
+                        value={editMinutes}
+                        disabled={selected.status === "ended"}
+                        onChange={(e) =>
+                          setEditMinutes(
+                            e.target.value === "" ? "" : Number(e.target.value),
+                          )
+                        }
+                      />
+                    </div>
+                    {selected.status === "ended" && (
+                      <div className="summary-box" style={{ marginBottom: 8 }}>
+                        <i className="ti ti-info-circle" />
+                        완료된 회의는 이름만 수정할 수 있습니다.
+                      </div>
+                    )}
+                    <button
+                      className="btn btn-primary"
+                      style={{ marginTop: 8 }}
+                      onClick={() => void saveMeetingSettings()}
+                      disabled={editSaving}
+                    >
+                      {editSaving ? "저장 중…" : "저장"}
+                    </button>
+                    <div style={{ marginTop: 32, borderTop: "1px solid var(--border-2)", paddingTop: 16 }}>
+                      <div className="panel-label" style={{ color: "var(--coral)" }}>위험 구역</div>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => setDeletingMeeting(true)}
+                      >
+                        <i className="ti ti-trash" /> 회의 삭제
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -1892,6 +2050,43 @@ export default function MeetingPage() {
           onConfirm={() => void deleteDecision()}
           onClose={() => setDeletingDecision(null)}
         />
+      )}
+
+      {/* 회의 삭제 확인 모달 */}
+      {deletingMeeting && (
+        <Modal
+          title="회의 삭제"
+          onClose={() => { setDeletingMeeting(false); setDeleteConfirmInput(""); }}
+          actions={
+            <>
+              <button className="btn" onClick={() => { setDeletingMeeting(false); setDeleteConfirmInput(""); }}>
+                취소
+              </button>
+              <button
+                className="btn btn-danger"
+                disabled={deleteConfirmInput !== "삭제하겠습니다" || busy}
+                onClick={() => void handleDeleteMeeting()}
+              >
+                삭제
+              </button>
+            </>
+          }
+        >
+          <div className="modal-sub">
+            회의와 관련된 모든 데이터(발화·결정·아젠다)가 영구 삭제됩니다.
+          </div>
+          <div className="field">
+            <label className="field-label">
+              확인을 위해 <strong>삭제하겠습니다</strong>를 입력하세요
+            </label>
+            <input
+              className="input"
+              placeholder="삭제하겠습니다"
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+            />
+          </div>
+        </Modal>
       )}
 
       {/* AI 태스크 확정 모달 */}
