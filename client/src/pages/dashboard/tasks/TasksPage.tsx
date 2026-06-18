@@ -166,7 +166,7 @@ export default function TasksPage() {
     if (!team) return;
     try {
       const [ts, cs] = await Promise.all([
-        apiGet<ActionItem[]>(`/action-items?team_id=${team.id}`),
+        apiGet<ActionItem[]>(`/action-items?team_id=${team.id}&confirmed=true`),
         apiGet<{ members: TeamContribution[] }>(
           `/teams/${team.id}/contributions`,
         ),

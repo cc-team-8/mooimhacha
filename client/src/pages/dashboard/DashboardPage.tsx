@@ -78,7 +78,7 @@ export default function DashboardPage() {
       .catch(() => {});
     void Promise.allSettled([
       apiGet<Meeting[]>(`/meetings?team_id=${teamId}`),
-      apiGet<ActionItem[]>(`/action-items?team_id=${teamId}`),
+      apiGet<ActionItem[]>(`/action-items?team_id=${teamId}&confirmed=true`),
       apiGet<AttendanceSummary[]>(`/teams/${teamId}/attendance-summary`),
       apiGet<TaskExtension[]>(`/teams/${teamId}/extensions?status=pending`),
     ]).then(([ms, ts, att, ext]) => {

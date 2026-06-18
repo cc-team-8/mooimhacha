@@ -135,7 +135,7 @@ export default function HomePage() {
         const badgeCls = t.my_role === "leader" ? "b-green" : "b-blue";
         const [ts, ms, cs, exts, consents] = await Promise.allSettled([
           apiGet<ActionItem[]>(
-            `/action-items?team_id=${t.id}&assignee_id=${user.id}`,
+            `/action-items?team_id=${t.id}&assignee_id=${user.id}&confirmed=true`,
           ),
           apiGet<Meeting[]>(`/meetings?team_id=${t.id}`),
           apiGet<{ members: TeamContribution[] }>(
