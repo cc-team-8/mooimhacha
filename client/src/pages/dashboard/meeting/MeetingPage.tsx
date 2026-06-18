@@ -1416,6 +1416,70 @@ export default function MeetingPage() {
                       </div>
                     ) : (
                       <>
+                        {pendingTasks.length > 0 && (
+                          <div className="summary-section summary-section--tasks">
+                            <div className="summary-header">
+                              <div className="summary-title summary-title--amber">
+                                <i className="ti ti-list-check" />
+                                AI 제안 태스크
+                                <span className="badge badge-amber">
+                                  {pendingTasks.length}개 검토 대기
+                                </span>
+                              </div>
+                            </div>
+                            <div className="summary-tasks">
+                              {pendingTasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  className="summary-task-item"
+                                >
+                                  <i className="ti ti-sparkles" />
+                                  <span className="summary-task-desc">
+                                    {task.description}
+                                  </span>
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => {
+                                      setConfirmTask(task);
+                                      setConfirmDesc(task.description);
+                                      setConfirmAssignee("");
+                                      setConfirmDue("");
+                                      setConfirmTime("");
+                                      setConfirmStatus("할 일");
+                                      setConfirmDifficulty(2);
+                                    }}
+                                  >
+                                    확정
+                                  </button>
+                                  <button
+                                    className="btn btn-sm"
+                                    onClick={async () => {
+                                      setPendingTasks((prev) =>
+                                        prev.filter((t) => t.id !== task.id),
+                                      );
+                                      try {
+                                        await apiDelete(
+                                          `/action-items/${task.id}`,
+                                        );
+                                      } catch (e) {
+                                        setPendingTasks((prev) => [
+                                          ...prev,
+                                          task,
+                                        ]);
+                                        showToast(
+                                          (e as Error).message,
+                                          "error",
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    제거
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="summary-section">
                           <div className="summary-header">
                             <div className="summary-title">
@@ -1475,103 +1539,6 @@ export default function MeetingPage() {
                             </div>
                           )}
                         </div>
-
-                        {pendingTasks.length > 0 && (
-                          <div
-                            className="summary-section"
-                            style={{ marginTop: 16 }}
-                          >
-                            <div className="summary-header">
-                              <div className="summary-title">
-                                <i className="ti ti-list-check" />
-                                AI 제안 태스크
-                                <span
-                                  className="badge"
-                                  style={{
-                                    marginLeft: 6,
-                                    background:
-                                      "var(--amber-soft, rgba(240,193,79,.18))",
-                                    color: "var(--amber, #b8860b)",
-                                  }}
-                                >
-                                  {pendingTasks.length}개 검토 대기
-                                </span>
-                              </div>
-                            </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 8,
-                                padding: "4px 0 8px",
-                              }}
-                            >
-                              {pendingTasks.map((task) => (
-                                <div
-                                  key={task.id}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    padding: "10px 14px",
-                                    background: "var(--surface-2)",
-                                    borderRadius: 8,
-                                    fontSize: 13,
-                                  }}
-                                >
-                                  <i
-                                    className="ti ti-sparkles"
-                                    style={{
-                                      color: "var(--amber, #b8860b)",
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <span style={{ flex: 1 }}>
-                                    {task.description}
-                                  </span>
-                                  <button
-                                    className="btn btn-sm btn-primary"
-                                    onClick={() => {
-                                      setConfirmTask(task);
-                                      setConfirmDesc(task.description);
-                                      setConfirmAssignee("");
-                                      setConfirmDue("");
-                                      setConfirmTime("");
-                                      setConfirmStatus("할 일");
-                                      setConfirmDifficulty(2);
-                                    }}
-                                  >
-                                    확정
-                                  </button>
-                                  <button
-                                    className="btn btn-sm"
-                                    onClick={async () => {
-                                      setPendingTasks((prev) =>
-                                        prev.filter((t) => t.id !== task.id),
-                                      );
-                                      try {
-                                        await apiDelete(
-                                          `/action-items/${task.id}`,
-                                        );
-                                      } catch (e) {
-                                        setPendingTasks((prev) => [
-                                          ...prev,
-                                          task,
-                                        ]);
-                                        showToast(
-                                          (e as Error).message,
-                                          "error",
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    제거
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
