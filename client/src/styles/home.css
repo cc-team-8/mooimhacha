@@ -285,11 +285,10 @@
   align-items: center;
   gap: 11px;
   padding: 10px 8px;
-  border-radius: 12px;
   transition: background-color 0.15s ease;
 }
 .task-row + .task-row {
-  box-shadow: inset 0 1px 0 var(--border-2);
+  border-top: 1px solid var(--border-2);
 }
 .t-check {
   width: 21px;
