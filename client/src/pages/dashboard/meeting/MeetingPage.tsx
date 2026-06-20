@@ -369,6 +369,8 @@ export default function MeetingPage() {
         void apiGet<Decision[]>(`/decisions?meeting_id=${selectedId}`)
           .then(setDecisions)
           .catch(() => {});
+      } else if (msg.type === "action:added") {
+        // 회의 탭에 실시간 액션 목록 없음 — Tasks 페이지에서 확인
       }
     };
     return () => ch.close();
@@ -565,6 +567,11 @@ export default function MeetingPage() {
       setDecisions(
         await apiGet<Decision[]>(`/decisions?meeting_id=${selectedId}`),
       );
+      if (!editingDecision) {
+        const ch = createCompanionChannel();
+        ch.postMessage({ type: "decision:added", meeting_id: selectedId });
+        ch.close();
+      }
       setDecInput("");
       setModalOpen(null);
       showToast(
@@ -815,6 +822,9 @@ export default function MeetingPage() {
       setModalOpen(null);
       setAgTitle("");
       showToast("아젠다가 추가되었습니다");
+      const ch = createCompanionChannel();
+      ch.postMessage({ type: "agenda:added", meeting_id: selectedId });
+      ch.close();
     } catch (e) {
       showToast((e as Error).message, "error");
     } finally {
