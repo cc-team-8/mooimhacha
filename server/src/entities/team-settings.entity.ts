@@ -51,6 +51,13 @@ export class TeamSettings {
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.5 })
   final_task_weight!: number;
 
+  // 회의 내 발언:출석 가중치 (합 1.0). 종합 기여 = 발언×(1-task)×ws + 출석×(1-task)×wa + 태스크×task
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.6 })
+  weight_speech_in_meeting!: number;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.4 })
+  weight_attend_in_meeting!: number;
+
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 1.0 })
   leader_bonus_multiplier!: number;
 

@@ -114,5 +114,7 @@ export interface TeamSettingsPayload {
   absent_meeting_handling: string;
   min_meeting_minutes: number;
   final_task_weight: number;
+  weight_speech_in_meeting: number;
+  weight_attend_in_meeting: number;
   leader_bonus_multiplier: number;
 }

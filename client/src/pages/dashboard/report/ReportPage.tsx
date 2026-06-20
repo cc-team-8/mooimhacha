@@ -8,10 +8,10 @@ import type { TeamContext } from "../DashboardPage";
 
 const AV_CLS = ["a1", "a2", "a3", "a4"];
 
-// 종합 기여 가중치 (발언 0.3 · 출석 0.2 · 태스크 0.5).
-const W_SPEECH = 0.3;
-const W_ATTEND = 0.2;
-const W_TASK = 0.5;
+// 종합 기여 가중치 기본값 (팀 설정 미로드 시 폴백). 실제 값은 팀 설정에서 동적으로.
+const DEFAULT_TASK_W = 0.5;
+const DEFAULT_SPEECH_W = 0.6; // 회의 내 발언:출석
+const DEFAULT_ATTEND_W = 0.4;
 const SEG_COLOR = {
   speech: "var(--blue)",
   attend: "var(--amber)",
@@ -155,6 +155,11 @@ export default function ReportPage() {
   const [members, setMembers] = useState<TeamContribution[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [tasks, setTasks] = useState<ActionItem[]>([]);
+  const [weights, setWeights] = useState<{
+    final_task_weight: number;
+    weight_speech_in_meeting: number;
+    weight_attend_in_meeting: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!team) return;
@@ -165,7 +170,12 @@ export default function ReportPage() {
       ),
       apiGet<Meeting[]>(`/meetings?team_id=${team.id}`),
       apiGet<ActionItem[]>(`/action-items?team_id=${team.id}`),
-    ]).then(([cs, ms, ts]) => {
+      apiGet<{
+        final_task_weight: number;
+        weight_speech_in_meeting: number;
+        weight_attend_in_meeting: number;
+      }>(`/teams/${team.id}/settings`),
+    ]).then(([cs, ms, ts, ws]) => {
       if (!alive) return;
       if (cs.status === "fulfilled")
         setMembers(
@@ -176,6 +186,7 @@ export default function ReportPage() {
       if (ms.status === "fulfilled") setMeetings(ms.value);
       if (ts.status === "fulfilled")
         setTasks(ts.value.filter((t) => t.status !== "cancelled"));
+      if (ws.status === "fulfilled") setWeights(ws.value);
     });
     return () => {
       alive = false;
@@ -185,14 +196,21 @@ export default function ReportPage() {
   // 발언 점수 환산에 쓰는 인원 수(산정 대상)
   const n = members.length || 1;
 
-  // 종합 점수 = 발언×0.3 + 출석×0.2 + 태스크×0.5 (모든 축 0~100). 전부 미측정이면 null.
+  // 종합 가중치 — 팀 설정 기반. 종합 = 발언×wSpeech + 출석×wAttend + 태스크×wTask (합 1).
+  const wTask = weights?.final_task_weight ?? DEFAULT_TASK_W;
+  const wSpeech =
+    (1 - wTask) * (weights?.weight_speech_in_meeting ?? DEFAULT_SPEECH_W);
+  const wAttend =
+    (1 - wTask) * (weights?.weight_attend_in_meeting ?? DEFAULT_ATTEND_W);
+
+  // 종합 점수 = 발언×wSpeech + 출석×wAttend + 태스크×wTask (모든 축 0~100). 전부 미측정이면 null.
   const scoreOf = (m: TeamContribution): number | null => {
     const sp = speechScore(m.speech_avg, n);
     const at = pct(m.attendance_avg);
     const ts = pct(m.task_score);
     if (sp == null && at == null && ts == null) return null;
     return Math.round(
-      (sp ?? 0) * W_SPEECH + (at ?? 0) * W_ATTEND + (ts ?? 0) * W_TASK,
+      (sp ?? 0) * wSpeech + (at ?? 0) * wAttend + (ts ?? 0) * wTask,
     );
   };
 
@@ -205,7 +223,7 @@ export default function ReportPage() {
       ? Math.round(vals.reduce((a, v) => a + v, 0) / vals.length)
       : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members]);
+  }, [members, wSpeech, wAttend, wTask]);
 
   // 레이더: 나 vs 팀 평균 (출석·참여도(발언 점수)·태스크)
   const radar = useMemo(() => {
@@ -325,13 +343,13 @@ export default function ReportPage() {
             }}
           >
             <span>
-              <Swatch color={SEG_COLOR.speech} />발언 (×0.3)
+              <Swatch color={SEG_COLOR.speech} />발언 (×{wSpeech.toFixed(2)})
             </span>
             <span>
-              <Swatch color={SEG_COLOR.attend} />출석 (×0.2)
+              <Swatch color={SEG_COLOR.attend} />출석 (×{wAttend.toFixed(2)})
             </span>
             <span>
-              <Swatch color={SEG_COLOR.task} />태스크 (×0.5)
+              <Swatch color={SEG_COLOR.task} />태스크 (×{wTask.toFixed(2)})
             </span>
             <span style={{ marginLeft: "auto" }}>막대 = 종합 기여 합산</span>
           </div>
@@ -372,9 +390,9 @@ export default function ReportPage() {
                       ? "md"
                       : "lo";
               const low = score != null && score < 10;
-              const segS = (sScore ?? 0) * W_SPEECH;
-              const segA = (attend ?? 0) * W_ATTEND;
-              const segT = (taskPct ?? 0) * W_TASK;
+              const segS = (sScore ?? 0) * wSpeech;
+              const segA = (attend ?? 0) * wAttend;
+              const segT = (taskPct ?? 0) * wTask;
               const chips = diffChipsOf(tasks, m.user_id);
               return (
                 <div key={m.user_id} className="mrc">

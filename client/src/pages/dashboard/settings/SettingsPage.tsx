@@ -29,6 +29,9 @@ interface Settings {
   min_meeting_minutes: number;
   punctuality_grace_ratio: number;
   leader_bonus_multiplier: number;
+  final_task_weight: number;
+  weight_speech_in_meeting: number;
+  weight_attend_in_meeting: number;
   slack_bot_token?: string | null;
   slack_channel_id?: string | null;
 }
@@ -553,6 +556,73 @@ export default function SettingsPage() {
                       },
                   )
                 }
+                disabled={!isLeader}
+              />
+            </div>
+
+            <div className="field">
+              <label className="field-label">
+                기여도 가중치 — 태스크 비중{" "}
+                <span style={{ color: "var(--text-soft)", fontWeight: 400 }}>
+                  종합: 발언{" "}
+                  {Math.round(
+                    (1 - settings.final_task_weight) *
+                      settings.weight_speech_in_meeting *
+                      100,
+                  )}
+                  % · 출석{" "}
+                  {Math.round(
+                    (1 - settings.final_task_weight) *
+                      settings.weight_attend_in_meeting *
+                      100,
+                  )}
+                  % · 태스크 {Math.round(settings.final_task_weight * 100)}%
+                </span>
+              </label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.final_task_weight}
+                onChange={(e) =>
+                  setSettings(
+                    (s) =>
+                      s && { ...s, final_task_weight: Number(e.target.value) },
+                  )
+                }
+                disabled={!isLeader}
+              />
+            </div>
+
+            <div className="field">
+              <label className="field-label">
+                회의 내 발언 비중 (출석 = 나머지){" "}
+                <span style={{ color: "var(--text-soft)", fontWeight: 400 }}>
+                  현재: 발언 {Math.round(settings.weight_speech_in_meeting * 100)}
+                  % · 출석 {Math.round(settings.weight_attend_in_meeting * 100)}%
+                </span>
+              </label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.weight_speech_in_meeting}
+                onChange={(e) => {
+                  const ws = Number(e.target.value);
+                  setSettings(
+                    (s) =>
+                      s && {
+                        ...s,
+                        weight_speech_in_meeting: ws,
+                        weight_attend_in_meeting:
+                          Math.round((1 - ws) * 100) / 100,
+                      },
+                  );
+                }}
                 disabled={!isLeader}
               />
             </div>

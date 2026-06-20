@@ -82,13 +82,13 @@ export interface ExternalFullPipelineResponse {
 
 // --- 변환 함수 ---
 
-// 우리 팀 설정 → 외부 설정. 발언/참석 가중치는 docs/06 기준 0.6/0.4 를 명시 전달한다
+// 우리 팀 설정 → 외부 설정. 발언/참석 가중치는 팀 설정값(기본 0.6/0.4)을 전달한다
 // (외부 엔진 기본값 0.75/0.25 미사용 — 로컬 폴백 스코어러와 결과 일관성 유지).
 export function mapTeamSettings(s: TeamSettingsPayload): ExternalTeamSettings {
   const curve = s.deadline_penalty_curve ?? 'standard';
   return {
-    weight_speech_in_meeting: 0.6,
-    weight_attend_in_meeting: 0.4,
+    weight_speech_in_meeting: s.weight_speech_in_meeting ?? 0.6,
+    weight_attend_in_meeting: s.weight_attend_in_meeting ?? 0.4,
     weight_task_in_final: s.final_task_weight ?? 0.5,
     punctuality_grace_ratio: s.punctuality_grace_ratio ?? 0.1,
     absence_grace_sec: s.presence_grace_seconds ?? 30,

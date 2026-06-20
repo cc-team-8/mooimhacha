@@ -52,6 +52,27 @@ export class UpdateTeamSettingsDto {
   @Max(240)
   min_meeting_minutes?: number;
 
+  @ApiPropertyOptional({ minimum: 0, maximum: 1.0, description: '종합에서 태스크 비중' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1.0)
+  final_task_weight?: number;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 1.0, description: '회의 내 발언 가중치 (출석과 합 1.0)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1.0)
+  weight_speech_in_meeting?: number;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 1.0, description: '회의 내 출석 가중치 (발언과 합 1.0)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1.0)
+  weight_attend_in_meeting?: number;
+
   @ApiPropertyOptional({ maximum: 1.0 })
   @IsOptional()
   @IsNumber()

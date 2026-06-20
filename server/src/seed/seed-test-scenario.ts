@@ -182,6 +182,8 @@ async function seed() {
         absent_meeting_handling: 'exclude',
         min_meeting_minutes: 5,
         final_task_weight: 0.5,
+        weight_speech_in_meeting: 0.6,
+        weight_attend_in_meeting: 0.4,
         leader_bonus_multiplier: 1.0,
       };
       const payload: MeetingScoreRequest = {
