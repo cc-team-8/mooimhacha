@@ -1213,7 +1213,6 @@ export default function MeetingPage() {
                       "attendance",
                       "decision",
                       "summary",
-                      "settings",
                     ] as Tab[]
                   ).map((t) => (
                     <div
@@ -1228,11 +1227,23 @@ export default function MeetingPage() {
                           attendance: "출결",
                           decision: "결정 사항",
                           summary: "회의 요약",
-                          settings: "회의 설정",
                         }[t]
                       }
                     </div>
                   ))}
+                  <div
+                    style={{
+                      width: 1,
+                      background: "var(--border-2)",
+                      margin: "8px 6px",
+                    }}
+                  />
+                  <div
+                    className={`tab ${tab === "settings" ? "active" : ""}`}
+                    onClick={() => setTab("settings")}
+                  >
+                    회의 설정
+                  </div>
                 </div>
               </div>
 
