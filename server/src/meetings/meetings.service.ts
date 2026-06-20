@@ -177,6 +177,41 @@ export class MeetingsService {
     );
   }
 
+  private async notifyMeetingEnded(meeting: Meeting): Promise<void> {
+    const settings = await this.settingsRepo.findOne({
+      where: { team_id: meeting.team_id },
+    });
+    if (!settings?.slack_bot_token || !settings.slack_channel_id) return;
+
+    const [decisions, actions] = await Promise.all([
+      this.decisionRepo.find({ where: { meeting_id: meeting.id } }),
+      this.actionRepo.find({ where: { meeting_id: meeting.id } }),
+    ]);
+
+    const lines: string[] = [`🏁 [${meeting.topic ?? '회의'}] 종료됐습니다`];
+
+    if (decisions.length > 0) {
+      lines.push(`\n📋 결정 사항 (${decisions.length}개)`);
+      decisions.forEach((d) => lines.push(`• ${d.content}`));
+    }
+
+    if (actions.length > 0) {
+      lines.push(`\n✅ 액션 아이템 (${actions.length}개)`);
+      actions.forEach((a) => {
+        const due = a.due_date
+          ? ` (마감: ${new Date(a.due_date).toLocaleDateString('ko-KR')})`
+          : '';
+        lines.push(`• ${a.description}${due}`);
+      });
+    }
+
+    await this.slackService.sendChannelMessage(
+      settings.slack_bot_token,
+      settings.slack_channel_id,
+      lines.join('\n'),
+    );
+  }
+
   // 회의 종료 — 안건 마감 처리 + 기여도(트랙1) 산정·저장 트리거
   async end(userId: number, id: number) {
     const meeting = await this.requireMeeting(id);
@@ -199,6 +234,7 @@ export class MeetingsService {
       meeting_id: meeting.id,
       team_id: meeting.team_id,
     });
+    void this.notifyMeetingEnded(meeting);
 
     try {
       await this.finalizeAgendas(meeting.id, endedAt, meeting.t0_timestamp);
