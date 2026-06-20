@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TeamMember } from "@/lib/types";
-import { todayStr } from "@/lib/dateUtils";
+import { todayStr, nowTimeStr, timeMinForDate } from "@/lib/dateUtils";
 
 // 결정 사항·액션 빠른 입력. 단축키 Ctrl/Cmd+D(결정)·Ctrl/Cmd+A(액션).
 // 입력된 항목은 현재 진행 중 아젠다에 서버가 자동 연결.
@@ -12,7 +12,7 @@ interface Props {
     description: string;
     assignee_id?: number;
     due_date?: string;
-    is_for_next_meeting?: boolean;
+    difficulty?: number;
   }) => Promise<boolean>;
 }
 
@@ -22,7 +22,9 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
   const [actionDesc, setActionDesc] = useState("");
   const [assignee, setAssignee] = useState<string>("");
   const [due, setDue] = useState(todayStr());
-  const [forNext, setForNext] = useState(false);
+  const [dueTime, setDueTime] = useState(nowTimeStr());
+  const [difficulty, setDifficulty] = useState(2);
+  const [timeError, setTimeError] = useState("");
 
   const decisionRef = useRef<HTMLInputElement>(null);
   const actionRef = useRef<HTMLInputElement>(null);
@@ -56,22 +58,31 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
   const submitAction = () => {
     const d = actionDesc.trim();
     if (!d) return;
+    if (due && dueTime && new Date(`${due}T${dueTime}`) <= new Date()) {
+      setTimeError("현재 시각 이후로 설정해 주세요");
+      return;
+    }
+    setTimeError("");
     const prevDue = due;
-    const prevForNext = forNext;
+    const prevDueTime = dueTime;
+    const prevDifficulty = difficulty;
     setActionDesc("");
-    setDue("");
-    setForNext(false);
+    setDue(todayStr());
+    setDueTime(nowTimeStr());
+    setDifficulty(2);
     void onAction({
       description: d,
       assignee_id: assignee ? Number(assignee) : undefined,
-      due_date: prevDue ? new Date(prevDue).toISOString() : undefined,
-      is_for_next_meeting: prevForNext,
+      due_date: prevDue
+        ? new Date(`${prevDue}T${prevDueTime || "23:59"}`).toISOString()
+        : undefined,
+      difficulty: prevDifficulty,
     }).then((ok) => {
       if (!ok) {
-        // 실패 시 복원 — 그 사이 새 입력이 있으면 우선
         setActionDesc((cur) => (cur === "" ? d : cur));
         setDue((cur) => (cur === "" ? prevDue : cur));
-        setForNext((cur) => cur || prevForNext);
+        setDueTime((cur) => (cur === "" ? prevDueTime : cur));
+        setDifficulty((cur) => (cur === 2 ? prevDifficulty : cur));
       }
     });
   };
@@ -83,7 +94,7 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
         onClick={() => setCollapsed((c) => !c)}
         title={collapsed ? "펼치기" : "접기"}
       >
-        <h2>결정 · 액션</h2>
+        <h2>결정 · 태스크</h2>
         <span className="cmp-toggle-btn">
           <i className={`ti ti-chevron-${collapsed ? "down" : "up"}`} />
         </span>
@@ -104,7 +115,7 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
           </div>
           <div className="cmp-quick-block">
             <label>
-              액션 <kbd>⌘A</kbd>
+              태스크 <kbd>⌘A</kbd>
             </label>
             <input
               ref={actionRef}
@@ -113,6 +124,11 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
               onChange={(e) => setActionDesc(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submitAction()}
             />
+            {timeError && (
+              <span style={{ fontSize: 11, color: "var(--coral)" }}>
+                {timeError}
+              </span>
+            )}
             <div className="cmp-quick-action-meta">
               <select
                 value={assignee}
@@ -131,14 +147,22 @@ export default function QuickInput({ members, onDecision, onAction }: Props) {
                 value={due}
                 onChange={(e) => setDue(e.target.value)}
               />
-              <label className="cmp-quick-next" title="다음 회의 전까지">
-                <input
-                  type="checkbox"
-                  checked={forNext}
-                  onChange={(e) => setForNext(e.target.checked)}
-                />
-                다음 회의 전
-              </label>
+              <input
+                type="time"
+                min={timeMinForDate(due)}
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+              />
+            </div>
+            <div className="cmp-quick-action-meta">
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(Number(e.target.value))}
+              >
+                <option value={1}>★ 낮음</option>
+                <option value={2}>★★ 보통</option>
+                <option value={3}>★★★ 높음</option>
+              </select>
               <button onClick={submitAction}>추가</button>
             </div>
           </div>

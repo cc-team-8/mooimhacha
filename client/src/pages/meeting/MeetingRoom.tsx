@@ -555,7 +555,7 @@ export default function MeetingRoom({ meetingId, teamId }: Props) {
     description: string;
     assignee_id?: number;
     due_date?: string;
-    is_for_next_meeting?: boolean;
+    difficulty?: number;
   }): Promise<boolean> => {
     const s = socketRef.current;
     if (!s) return false;
