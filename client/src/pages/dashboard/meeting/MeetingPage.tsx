@@ -2009,6 +2009,7 @@ export default function MeetingPage() {
               placeholder="예) 중간 점검 회의"
               value={newTopic}
               onChange={(e) => setNewTopic(e.target.value)}
+              autoFocus
             />
           </div>
           <div className="field">
@@ -2166,6 +2167,7 @@ export default function MeetingPage() {
               maxLength={200}
               value={quickTopic}
               onChange={(e) => setQuickTopic(e.target.value)}
+              autoFocus
             />
           </div>
           <div className="field">
