@@ -337,6 +337,12 @@ export class MeetingsService {
         groups: unassigned,
       });
     }
+    // 발화가 없는 섹션은 끝으로, 나머지는 첫 발화 시각 기준 오름차순
+    sections.sort((a, b) => {
+      const aStart = a.groups[0]?.started_at_offset_ms ?? Infinity;
+      const bStart = b.groups[0]?.started_at_offset_ms ?? Infinity;
+      return aStart - bStart;
+    });
     return { meeting_id: meeting.id, sections };
   }
 
