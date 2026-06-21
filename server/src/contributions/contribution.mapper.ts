@@ -61,6 +61,8 @@ export interface ExternalTaskScoreResponse {
   score: number | null;
   total_actions: number;
   completed_actions: number;
+  completed_weight: number;
+  volume_score: number | null;
 }
 
 export interface ExternalFinalScoreResponse {
@@ -248,4 +250,33 @@ export function toTaskActions(
     }
   }
   return out;
+}
+
+// 완료한 액션의 난이도 가중 합 (= 한 사람의 절대 완료량). volume_score 계산의 기초값.
+function completedWeight(actions: ExternalActionItem[]): number {
+  return actions
+    .filter((a) => a.completed)
+    .reduce((sum, a) => sum + a.difficulty, 0);
+}
+
+// 팀 전체 멤버의 완료 난이도 가중 합 평균 — task_score 의 완료량(volume_score) 정규화 기준.
+// 분모는 "태스크를 1개 이상 배정받은 인원 수"만 센다. 태스크를 전혀 안 받은 사람을
+// 분모에 포함시키면 평균이 부당하게 낮아져, 정작 일을 받은 사람들 사이의 비교가
+// 왜곡된다 — 실제로 일을 배정받은 사람들 사이에서의 상대 평가가 되도록 한다.
+// 아무도 태스크를 안 받았거나, 받았지만 전원 완료량이 0이면 비교 의미가 없으므로
+// null 을 반환해 엔진이 해당 축을 제외하고 completion_ratio·deadline_avg 두 축만으로
+// 계산하게 한다(엔진 쪼 하위 호환 동작).
+export function computeTeamAvgCompletedWeight(
+  actionItems: TeamContributionRequest['action_items'],
+  memberUserIds: number[],
+  now: Date,
+): number | null {
+  const weights = memberUserIds
+    .map((userId) => toTaskActions(actionItems, userId, now))
+    .filter((actions) => actions.length > 0)
+    .map((actions) => completedWeight(actions));
+  if (weights.length === 0) return null;
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  if (total <= 0) return null;
+  return total / weights.length;
 }
