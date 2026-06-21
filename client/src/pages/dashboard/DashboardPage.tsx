@@ -43,7 +43,6 @@ const NAV_ITEMS = [
   { key: "meeting", icon: "ti-video", label: "회의 관리" },
   { key: "tasks", icon: "ti-checklist", label: "태스크" },
   { key: "report", icon: "ti-chart-bar", label: "기여도 리포트" },
-  { key: "settings", icon: "ti-settings", label: "팀 설정" },
 ];
 
 // NAV의 label과 별도로 관리: 헤더 타이틀은 아이콘·badge 없이 문자열만 필요하기 때문
@@ -189,6 +188,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="sb-spacer" />
+        <div
+          className={`nav-item ${current === "settings" ? "active" : ""}`}
+          onClick={() => navigate(`/dashboard/${teamId}/settings`)}
+        >
+          <i className="ti ti-settings" />
+          팀 설정
+        </div>
         <div className="sb-user">
           <div className="av a1 av-md">{currentUser?.name[0] ?? "?"}</div>
           <div>
