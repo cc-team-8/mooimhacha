@@ -14,6 +14,7 @@ import {
   ExternalFullPipelineResponse,
   ExternalMemberMeetingData,
   ExternalTeamSettings,
+  computeTeamAvgCompletedWeight,
   deriveMemberData,
   mapTeamSettings,
   toTaskActions,
@@ -101,6 +102,14 @@ export class ContributionClient {
     );
     const cfg = mapTeamSettings(payload.team_settings);
     const now = new Date();
+    // 태스크 완료량(volume_score) 정규화 기준 — 멤버별 호출 전에 팀 전체를 한 번만 계산.
+    // 멤버 1명씩 fan-out 되는 /pipeline/score 호출 안에서는 다른 멤버의 완료량을 알 수
+    // 없으므로, 비교 기준값을 미리 구해서 매 호출에 동봉해야 한다.
+    const teamAvgCompletedWeight = computeTeamAvgCompletedWeight(
+      payload.action_items,
+      payload.members.map((m) => m.user_id),
+      now,
+    );
     const members = await Promise.all(
       payload.members.map(async (m) => {
         const actions = toTaskActions(payload.action_items, m.user_id, now);
@@ -124,7 +133,12 @@ export class ContributionClient {
         // (사유 결석 + 비정규라 누적(②)에서는 제외된다)
         if (rows.length === 0) rows.push(taskCarrierRow(m.user_id));
         rows[0] = { ...rows[0], actions };
-        const ext = await this.pipeline(rows, m.role === 'leader', cfg);
+        const ext = await this.pipeline(
+          rows,
+          m.role === 'leader',
+          cfg,
+          teamAvgCompletedWeight,
+        );
         return {
           user_id: m.user_id,
           // 포함 회의 0건이면 엔진은 0.0 을 주지만 "측정 불가"는 null 로 구분 (로컬 스코어러와 동일)
@@ -146,11 +160,13 @@ export class ContributionClient {
     meetings: ExternalMemberMeetingData[],
     isLeader: boolean,
     cfg: ExternalTeamSettings,
+    teamAvgCompletedWeight: number | null = null,
   ): Promise<ExternalFullPipelineResponse> {
     return this.post<ExternalFullPipelineResponse>('/pipeline/score', {
       meetings,
       is_leader: isLeader,
       cfg,
+      team_avg_completed_weight: teamAvgCompletedWeight,
     });
   }
 

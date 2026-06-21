@@ -73,12 +73,7 @@ export class ContributionsService {
         this.membershipRepo.find({ where: { team_id: meeting.team_id } }),
       ]);
 
-    // 참석자: presence join 기록자, 없으면 팀 멤버 전원
-    const joined = new Set(
-      presence.filter((p) => p.event_type === 'join').map((p) => p.user_id),
-    );
-    const participantIds =
-      joined.size > 0 ? [...joined] : members.map((m) => m.user_id);
+    const participantIds = members.map((m) => m.user_id);
 
     const payload = {
       meeting: {
@@ -337,10 +332,6 @@ export class ContributionsService {
       action_items: teamPayload.action_items,
       meetings: meetings.map((m) => {
         const pres = presByMeeting.get(m.id) ?? [];
-        // 참석자 규칙은 ① 저장 때와 동일: join 기록자, 없으면 현재 팀 멤버 전원
-        const joined = new Set(
-          pres.filter((p) => p.event_type === 'join').map((p) => p.user_id),
-        );
         return {
           meeting: {
             id: m.id,
@@ -352,8 +343,7 @@ export class ContributionsService {
           },
           is_invalidated: m.is_invalidated,
           team_settings: settings,
-          participant_user_ids:
-            joined.size > 0 ? [...joined] : currentMemberIds,
+          participant_user_ids: currentMemberIds,
           utterances: (uttByMeeting.get(m.id) ?? []).map((u) => ({
             user_id: u.user_id,
             char_count: u.char_count,
