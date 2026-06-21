@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { avatarBg } from "@/lib/avatarColor";
 import { useToast } from "@/hooks/useToast";
 import { getUser, clearSession } from "@/lib/auth";
 import { apiFetch, authHeader } from "@/lib/apiFetch";
@@ -23,7 +24,7 @@ interface Team {
   course_name: string;
   my_role: "leader" | "member";
   member_count: number;
-  members: { name: string; role: string }[];
+  members: { name: string; nickname?: string | null; role: string }[];
 }
 
 // 내 태스크/예정 회의에 소속 그룹 이름을 같이 표기하기 위한 합성 타입
@@ -426,8 +427,12 @@ export default function HomePage() {
                     </div>
                     <div className="gc-avs">
                       {team.members.slice(0, 4).map((m, i) => (
-                        <div key={i} className={`av a${(i % 4) + 1} av-sm`}>
-                          {m.name[0]}
+                        <div
+                          key={i}
+                          className="av av-sm"
+                          style={{ background: avatarBg(i) }}
+                        >
+                          {(m.nickname ?? m.name)[0]}
                         </div>
                       ))}
                       <span className="gc-more">{team.member_count}명</span>

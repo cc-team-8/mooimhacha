@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   useOutletContext,
   useNavigate,
@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/useToast";
 import { apiFetch, authHeader } from "@/lib/apiFetch";
 import { apiDelete, apiGet, apiPatch } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { avatarBg } from "@/lib/avatarColor";
 import { useTeamStore } from "@/stores/teamStore";
 import Card from "@/components/Card";
 import Modal from "@/components/Modal";
@@ -80,6 +81,18 @@ export default function SettingsPage() {
   const [slackUserId, setSlackUserId] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
 
+  const nicknameMap = useMemo(
+    () =>
+      new Map(
+        (team?.members ?? []).map((m) => [m.user_id, m.nickname ?? m.name]),
+      ),
+    [team],
+  );
+  const memberIdx = (userId: number) => {
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === userId);
+    return i < 0 ? userId % 32 : i;
+  };
+
   const loadMembers = useCallback(() => {
     if (!team) return;
     apiGet<{ members: TeamContribution[] }>(`/teams/${team.id}/contributions`)
@@ -101,14 +114,18 @@ export default function SettingsPage() {
         await apiDelete(
           `/teams/${team.id}/members/${memberAction.target.user_id}`,
         );
-        showToast(`${memberAction.target.name}님을 내보냈습니다`);
+        showToast(
+          `${nicknameMap.get(memberAction.target.user_id) ?? memberAction.target.name}님을 내보냈습니다`,
+        );
         setMemberAction(null);
         loadMembers();
       } else if (memberAction.kind === "transfer") {
         await apiPatch(`/teams/${team.id}/leader`, {
           user_id: memberAction.target.user_id,
         });
-        showToast(`${memberAction.target.name}님이 새 팀장이 되었습니다`);
+        showToast(
+          `${nicknameMap.get(memberAction.target.user_id) ?? memberAction.target.name}님이 새 팀장이 되었습니다`,
+        );
         // 사이드바·설정 화면의 역할 표시를 한 번에 갱신하기 위해 전체 리로드
         window.location.reload();
       } else {
@@ -474,9 +491,21 @@ export default function SettingsPage() {
                       : undefined,
                 }}
               >
-                <div className={`av a${(i % 4) + 1} av-sm`}>{m.name[0]}</div>
-                <span style={{ fontSize: 13.5, fontWeight: 600 }}>
-                  {m.name}
+                <div
+                  className="av av-sm"
+                  style={{ background: avatarBg(memberIdx(m.user_id)) }}
+                >
+                  {(nicknameMap.get(m.user_id) ?? m.name)[0]}
+                </div>
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                  }}
+                >
+                  {nicknameMap.get(m.user_id) ?? m.name}
                   {isMe && (
                     <span
                       style={{
@@ -495,7 +524,6 @@ export default function SettingsPage() {
                 >
                   {m.role === "leader" ? "팀장" : "팀원"}
                 </span>
-                <span style={{ flex: 1 }} />
                 {isLeader && !isMe && (
                   <>
                     <button
@@ -603,20 +631,14 @@ export default function SettingsPage() {
                 >
                   마감을 넘겨 제출한 태스크의 감점 폭을 정합니다.
                   <br />
-                  <strong style={{ color: "var(--text-main)" }}>
-                    표준
-                  </strong>{" "}
-                  · 경과 시간에 비례해 일반적인 수준으로 감점합니다.
+                  <strong style={{ color: "var(--text-main)" }}>표준</strong> ·
+                  경과 시간에 비례해 일반적인 수준으로 감점합니다.
                   <br />
-                  <strong style={{ color: "var(--text-main)" }}>
-                    완화
-                  </strong>{" "}
-                  · 늦게 제출해도 감점 폭이 작아 마감을 유연하게 적용합니다.
+                  <strong style={{ color: "var(--text-main)" }}>완화</strong> ·
+                  늦게 제출해도 감점 폭이 작아 마감을 유연하게 적용합니다.
                   <br />
-                  <strong style={{ color: "var(--text-main)" }}>
-                    엄격
-                  </strong>{" "}
-                  · 감점 폭이 커 기한 준수를 강하게 반영합니다.
+                  <strong style={{ color: "var(--text-main)" }}>엄격</strong> ·
+                  감점 폭이 커 기한 준수를 강하게 반영합니다.
                 </div>
               )}
               <select
@@ -656,12 +678,8 @@ export default function SettingsPage() {
                   numDraft.min_meeting_minutes ??
                   String(settings.min_meeting_minutes)
                 }
-                onChange={(e) =>
-                  editNum("min_meeting_minutes", e.target.value)
-                }
-                onBlur={(e) =>
-                  commitNum("min_meeting_minutes", e.target.value)
-                }
+                onChange={(e) => editNum("min_meeting_minutes", e.target.value)}
+                onBlur={(e) => commitNum("min_meeting_minutes", e.target.value)}
                 disabled={!isLeader}
               />
             </div>
@@ -1193,13 +1211,21 @@ export default function SettingsPage() {
           message={
             memberAction.kind === "kick" ? (
               <>
-                <b>{memberAction.target.name}</b>님을 팀에서 내보낼까요?
+                <b>
+                  {nicknameMap.get(memberAction.target.user_id) ??
+                    memberAction.target.name}
+                </b>
+                님을 팀에서 내보낼까요?
                 <br />
                 과거 회의·기여도 기록은 보존됩니다.
               </>
             ) : memberAction.kind === "transfer" ? (
               <>
-                <b>{memberAction.target.name}</b>님에게 팀장을 위임할까요?
+                <b>
+                  {nicknameMap.get(memberAction.target.user_id) ??
+                    memberAction.target.name}
+                </b>
+                님에게 팀장을 위임할까요?
                 <br />
                 나는 팀원으로 변경됩니다.
               </>

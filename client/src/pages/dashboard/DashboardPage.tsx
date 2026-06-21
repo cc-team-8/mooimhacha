@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getUser } from "@/lib/auth";
+import { avatarBg } from "@/lib/avatarColor";
 import { apiFetch, authHeader } from "@/lib/apiFetch";
 import { apiGet } from "@/lib/api";
 import { createCompanionChannel } from "@/lib/companion";
@@ -34,7 +35,12 @@ export interface TeamContext {
   course_name: string;
   my_role: "leader" | "member";
   member_count: number;
-  members: { name: string; role: string }[];
+  members: {
+    user_id: number;
+    name: string;
+    nickname: string | null;
+    role: string;
+  }[];
 }
 
 const NAV_ITEMS = [
@@ -68,6 +74,9 @@ export default function DashboardPage() {
   const [openTaskCount, setOpenTaskCount] = useState(0);
   // 처리할 일 알림(!): 회의=결석 동의 미처리, 태스크=팀장 연장 요청 대기
   const [hasAbsenceTodo, setHasAbsenceTodo] = useState(false);
+  // 닉네임 인라인 편집
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
 
   useEffect(() => {
     if (!teamId) return;
@@ -126,6 +135,36 @@ export default function DashboardPage() {
     return false;
   };
 
+  const myMember = team?.members.find((m) => m.user_id === currentUser?.id);
+  const myIdx =
+    team?.members.findIndex((m) => m.user_id === currentUser?.id) ?? 0;
+  const displayName = myMember?.nickname ?? currentUser?.name ?? "";
+
+  const handleSaveNickname = async () => {
+    if (!teamId) return;
+    const trimmed = nicknameInput.trim() || null;
+    try {
+      await apiFetch(`/api/teams/${teamId}/members/me/nickname`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ nickname: trimmed }),
+      });
+      setTeam((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: prev.members.map((m) =>
+                m.user_id === currentUser?.id ? { ...m, nickname: trimmed } : m,
+              ),
+            }
+          : prev,
+      );
+      setEditingNickname(false);
+    } catch {
+      // 저장 실패 시 편집 상태 유지
+    }
+  };
+
   return (
     <div className="dash-shell" style={{ display: "flex", height: "100vh" }}>
       {/* 사이드바 */}
@@ -174,10 +213,14 @@ export default function DashboardPage() {
           <div className="sb-sec">팀원</div>
           {(team?.members ?? []).map((m, i) => (
             <div key={i} className="sb-mrow">
-              <div className={`av a${(i % 4) + 1} av-sm`}>{m.name[0]}</div>
-              {m.name}
+              <div className="av av-sm" style={{ background: avatarBg(i) }}>
+                {(m.nickname ?? m.name)[0]}
+              </div>
+              <span className="sb-mname" data-tooltip={m.nickname ?? m.name}>
+                <span>{m.nickname ?? m.name}</span>
+              </span>
               {m.role === "leader" && <span className="leader-tag">팀장</span>}
-              {m.name === currentUser?.name && (
+              {m.user_id === currentUser?.id && (
                 <span className="me-tag">나</span>
               )}
             </div>
@@ -193,13 +236,60 @@ export default function DashboardPage() {
           팀 설정
         </div>
         <div className="sb-user">
-          <div className="av a1 av-md">{currentUser?.name[0] ?? "?"}</div>
-          <div>
-            <div className="sb-user-name">{currentUser?.name ?? ""}</div>
-            <div className="sb-user-role">
-              {team?.my_role === "leader" ? "팀장" : "팀원"}
-            </div>
+          <div className="av av-md" style={{ background: avatarBg(myIdx) }}>
+            {displayName[0] ?? "?"}
           </div>
+          {editingNickname ? (
+            <div className="sb-nick-edit">
+              <input
+                className="sb-nick-input"
+                value={nicknameInput}
+                onChange={(e) => setNicknameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleSaveNickname();
+                  if (e.key === "Escape") setEditingNickname(false);
+                }}
+                maxLength={50}
+                autoFocus
+                placeholder={currentUser?.name ?? ""}
+              />
+              <div className="sb-nick-actions">
+                <button
+                  className="sb-nick-btn"
+                  onClick={() => void handleSaveNickname()}
+                  title="저장"
+                >
+                  <i className="ti ti-check" />
+                </button>
+                <button
+                  className="sb-nick-btn"
+                  onClick={() => setEditingNickname(false)}
+                  title="취소"
+                >
+                  <i className="ti ti-x" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="sb-user-name">{displayName}</div>
+                <div className="sb-user-role">
+                  {team?.my_role === "leader" ? "팀장" : "팀원"}
+                </div>
+              </div>
+              <button
+                className="sb-nick-edit-btn"
+                onClick={() => {
+                  setNicknameInput(myMember?.nickname ?? "");
+                  setEditingNickname(true);
+                }}
+                title="닉네임 편집"
+              >
+                <i className="ti ti-pencil" />
+              </button>
+            </>
+          )}
         </div>
       </aside>
 

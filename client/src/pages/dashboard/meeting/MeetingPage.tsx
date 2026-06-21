@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
 import HeadsetGateModal from "@/components/HeadsetGateModal";
+import MemberSelect from "@/components/MemberSelect";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { openCompanion, createCompanionChannel } from "@/lib/companion";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -64,7 +65,7 @@ const ATT_BADGE: Record<
   absent: { label: "결석", color: "var(--coral)", bg: "var(--coral-soft)" },
 };
 
-const AV_GRADS = ["var(--av1)", "var(--av2)", "var(--av3)", "var(--av4)"];
+import { avatarBg, memberColor } from "@/lib/avatarColor";
 
 function meetingMeta(
   m: Meeting,
@@ -199,6 +200,18 @@ export default function MeetingPage() {
   const [agMinutes, setAgMinutes] = useState<number | "">(10);
 
   const selected = meetings.find((m) => m.id === selectedId) ?? null;
+
+  const nicknameMap = useMemo(
+    () =>
+      new Map(
+        (team?.members ?? []).map((m) => [m.user_id, m.nickname ?? m.name]),
+      ),
+    [team],
+  );
+  const memberIdx = (userId: number) => {
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === userId);
+    return i < 0 ? userId % 32 : i;
+  };
 
   // 가장 최근에 종료된 회의 (선택 회의 제외)
   const prevMeeting = useMemo(() => {
@@ -1392,17 +1405,24 @@ export default function MeetingPage() {
                         s.speech_ratio != null && s.speech_ratio < 0.1;
                       return (
                         <div key={s.user_id} className="speak-row">
-                          <div className={`av a${(i % 4) + 1} av-sm`}>
-                            {s.name[0]}
+                          <div
+                            className="av av-sm"
+                            style={{
+                              background: avatarBg(memberIdx(s.user_id)),
+                            }}
+                          >
+                            {(nicknameMap.get(s.user_id) ?? s.name)[0]}
                           </div>
-                          <span className="speak-name">{s.name}</span>
+                          <span className="speak-name">
+                            {nicknameMap.get(s.user_id) ?? s.name}
+                          </span>
                           <span className="speak-bar">
                             <i
                               data-w={pct}
                               style={{
                                 background: warn
                                   ? "var(--coral)"
-                                  : AV_GRADS[i % AV_GRADS.length],
+                                  : memberColor(memberIdx(s.user_id)),
                               }}
                             />
                           </span>
@@ -1428,8 +1448,10 @@ export default function MeetingPage() {
                           className="ti ti-alert-triangle"
                           style={{ color: "var(--coral)" }}
                         />
-                        {lowSpeakers.map((s) => s.name).join(", ")}님의 발언
-                        비중이 10% 미만입니다. 의견을 물어봐 주세요.
+                        {lowSpeakers
+                          .map((s) => nicknameMap.get(s.user_id) ?? s.name)
+                          .join(", ")}
+                        님의 발언 비중이 10% 미만입니다. 의견을 물어봐 주세요.
                       </div>
                     )}
                     {/* 발화 기록 — 종료된 회의만 */}
@@ -1477,9 +1499,6 @@ export default function MeetingPage() {
                               const speaker = speak.find(
                                 (s) => s.user_id === g.user_id,
                               );
-                              const idx = speak.findIndex(
-                                (s) => s.user_id === g.user_id,
-                              );
                               return (
                                 <div key={i}>
                                   {showHeader && (
@@ -1489,13 +1508,28 @@ export default function MeetingPage() {
                                   )}
                                   <div className="utt-row">
                                     <div
-                                      className={`av a${(idx % 4) + 1} av-sm`}
+                                      className="av av-sm"
+                                      style={{
+                                        background: avatarBg(
+                                          memberIdx(g.user_id),
+                                        ),
+                                      }}
                                     >
-                                      {(speaker?.name ?? "?")[0]}
+                                      {
+                                        (speaker
+                                          ? (nicknameMap.get(speaker.user_id) ??
+                                            speaker.name)
+                                          : (nicknameMap.get(g.user_id) ??
+                                            "?"))[0]
+                                      }
                                     </div>
                                     <div className="utt-body">
                                       <span className="utt-name">
-                                        {speaker?.name ?? `사용자 ${g.user_id}`}
+                                        {speaker
+                                          ? (nicknameMap.get(speaker.user_id) ??
+                                            speaker.name)
+                                          : (nicknameMap.get(g.user_id) ??
+                                            `사용자 ${g.user_id}`)}
                                         <span className="utt-time">
                                           {selected.t0_timestamp
                                             ? (() => {
@@ -1568,11 +1602,21 @@ export default function MeetingPage() {
                               {/* 메인 행: 아바타 · 이름 · 배지 */}
                               <div className="att-row">
                                 <div
-                                  className={`av a${(mem.user_id % 4) + 1} av-sm`}
+                                  className="av av-sm"
+                                  style={{
+                                    background: avatarBg(
+                                      memberIdx(mem.user_id),
+                                    ),
+                                  }}
                                 >
-                                  {mem.name[0]}
+                                  {
+                                    (nicknameMap.get(mem.user_id) ??
+                                      mem.name)[0]
+                                  }
                                 </div>
-                                <span className="att-name">{mem.name}</span>
+                                <span className="att-name">
+                                  {nicknameMap.get(mem.user_id) ?? mem.name}
+                                </span>
                                 <span
                                   className="att-badge"
                                   style={{
@@ -2489,18 +2533,12 @@ export default function MeetingPage() {
           <div className="field-row">
             <div className="field">
               <label className="field-label">담당자</label>
-              <select
-                className="input"
+              <MemberSelect
+                members={members}
+                nicknameMap={nicknameMap}
                 value={confirmAssignee}
-                onChange={(e) => setConfirmAssignee(e.target.value)}
-              >
-                <option value="">미지정</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setConfirmAssignee}
+              />
             </div>
             <div className="field">
               <label className="field-label">마감일</label>

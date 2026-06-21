@@ -5,10 +5,8 @@ import { apiGet } from "@/lib/api";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { ActionItem, Meeting, TeamContribution } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
+import { avatarBg, memberColor } from "@/lib/avatarColor";
 
-const AV_CLS = ["a1", "a2", "a3", "a4"];
-// 멤버 행 인라인 레이더 색 (아바타 그라데이션 시작색의 솔리드 버전)
-const AV_RADAR = ["#1fc596", "#5b8bf3", "#f4ad53", "#e76b94"];
 // 기여도 리포트 열람 최소 종료 회의 수 (정확 측정 전제)
 const REQUIRED_MEETINGS = 3;
 
@@ -185,6 +183,18 @@ export default function ReportPage() {
     weight_attend_in_meeting: number;
   } | null>(null);
 
+  const nicknameMap = useMemo(
+    () =>
+      new Map(
+        (team?.members ?? []).map((m) => [m.user_id, m.nickname ?? m.name]),
+      ),
+    [team],
+  );
+  const memberIdx = (userId: number) => {
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === userId);
+    return i < 0 ? userId % 32 : i;
+  };
+
   useEffect(() => {
     if (!team) return;
     let alive = true;
@@ -273,7 +283,13 @@ export default function ReportPage() {
       const el = document.getElementById(
         `radar-${m.user_id}`,
       ) as SVGSVGElement | null;
-      if (el) drawRadar(el, memberTriple(m), teamAvg, AV_RADAR[i % 4]);
+      if (el)
+        drawRadar(
+          el,
+          memberTriple(m),
+          teamAvg,
+          memberColor(memberIdx(m.user_id)),
+        );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, teamAvg, n]);
@@ -457,8 +473,11 @@ export default function ReportPage() {
                     className="mrc-head"
                     style={{ display: "flex", alignItems: "center", gap: 12 }}
                   >
-                    <div className={`av ${AV_CLS[i % 4]} av-lg`}>
-                      {m.name[0]}
+                    <div
+                      className="av av-lg"
+                      style={{ background: avatarBg(memberIdx(m.user_id)) }}
+                    >
+                      {(nicknameMap.get(m.user_id) ?? m.name)[0]}
                     </div>
                     {/* 이름 줄: [이름][기여도 바][점수] 한 행, 역할(팀원)은 아래로 */}
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -478,7 +497,7 @@ export default function ReportPage() {
                             flex: "0 0 auto",
                           }}
                         >
-                          {m.name}
+                          {nicknameMap.get(m.user_id) ?? m.name}
                           {low && (
                             <span
                               className="nav-alert"

@@ -5,15 +5,7 @@ import { apiGet, apiPatch } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type { ActionItem, Meeting, TeamContribution } from "@/lib/types";
 import type { TeamContext } from "../DashboardPage";
-
-const MEMBER_COLORS = [
-  "var(--green)",
-  "var(--blue)",
-  "var(--pink)",
-  "var(--amber)",
-  "var(--coral)",
-  "var(--text-soft)",
-];
+import { avatarBg, memberColor } from "@/lib/avatarColor";
 
 // 마감일 표기: 오늘/내일은 강조, 그 외는 M/D
 function dueLabel(due: string | null): { text: string; color: string } | null {
@@ -87,6 +79,18 @@ export default function OverviewPage() {
   const [contrib, setContrib] = useState<TeamContribution[]>([]);
   const [tasks, setTasks] = useState<ActionItem[]>([]);
 
+  const nicknameMap = useMemo(
+    () =>
+      new Map(
+        (team?.members ?? []).map((m) => [m.user_id, m.nickname ?? m.name]),
+      ),
+    [team],
+  );
+  const memberIdx = (userId: number) => {
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === userId);
+    return i < 0 ? userId % 32 : i;
+  };
+
   useEffect(() => {
     if (!team) return;
     let alive = true;
@@ -135,7 +139,9 @@ export default function OverviewPage() {
         t.status === "todo" && d && (d.text === "오늘" || d.text === "내일")
       );
     });
-    const nameById = new Map(contrib.map((c) => [c.user_id, c.name]));
+    const nameById = new Map(
+      contrib.map((c) => [c.user_id, nicknameMap.get(c.user_id) ?? c.name]),
+    );
     const nextUnfinished = [...meetings]
       .filter((m) => m.status !== "ended")
       .sort(
@@ -161,7 +167,7 @@ export default function OverviewPage() {
       nextUnfinished,
       recent,
     };
-  }, [tasks, contrib, meetings]);
+  }, [tasks, contrib, meetings, nicknameMap]);
 
   // requestAnimationFrame으로 지연 적용: 마운트 직후 0% → data-w% 로 CSS transition 애니메이션.
   // 동기 적용하면 브라우저가 초기값과 최종값을 합쳐 렌더링해 transition이 발동하지 않음.
@@ -281,7 +287,7 @@ export default function OverviewPage() {
                   아직 산정된 기여도가 없습니다. 회의를 진행하면 집계돼요.
                 </div>
               )}
-              {contrib.map((c, i) => {
+              {contrib.map((c) => {
                 const pct =
                   c.composite_score == null
                     ? null
@@ -292,13 +298,18 @@ export default function OverviewPage() {
                 const myDone = myTasks.filter((t) => t.status === "done");
                 return (
                   <div key={c.user_id} className="contrib-row">
-                    <span className="c-name">{c.name}</span>
+                    <span
+                      className="c-name"
+                      data-tooltip={nicknameMap.get(c.user_id) ?? c.name}
+                    >
+                      <span>{nicknameMap.get(c.user_id) ?? c.name}</span>
+                    </span>
                     <span className="c-bar">
                       <i
                         data-w={pct ?? 0}
                         style={{
                           width: 0,
-                          background: MEMBER_COLORS[i % MEMBER_COLORS.length],
+                          background: memberColor(memberIdx(c.user_id)),
                         }}
                       />
                     </span>
@@ -359,14 +370,15 @@ export default function OverviewPage() {
               {(team?.members ?? []).slice(0, 5).map((m, i) => (
                 <div
                   key={i}
-                  className={`av a${(i % 4) + 1} av-sm`}
-                  title={m.name}
+                  className="av av-sm"
+                  title={m.nickname ?? m.name}
                   style={{
+                    background: avatarBg(i),
                     marginLeft: i === 0 ? 0 : -8,
                     boxShadow: "0 0 0 2px var(--surface)",
                   }}
                 >
-                  {m.name[0]}
+                  {(m.nickname ?? m.name)[0]}
                 </div>
               ))}
             </div>

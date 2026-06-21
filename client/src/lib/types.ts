@@ -13,6 +13,7 @@ export interface Team {
 export interface TeamMember {
   user_id: number;
   name: string;
+  nickname: string | null;
   profile_image_url: string | null;
   role: "leader" | "member";
 }
