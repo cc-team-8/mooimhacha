@@ -535,7 +535,7 @@ textarea.input {
   margin: 5px 0 16px;
 }
 .modal-wide {
-  width: 520px;
+  width: 480px;
 }
 .modal-body {
   margin-top: 18px;
@@ -769,4 +769,83 @@ textarea.input {
 }
 .info-tip:hover::after {
   opacity: 1;
+}
+
+/* data-tooltip — 즉시 표시, overflow:hidden과 분리하기 위해 외부 래퍼에 붙일 것 */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: rgba(30, 30, 30, 0.88);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 9999;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* MemberSelect */
+.ms-wrap {
+  position: relative;
+  width: 100%;
+}
+.ms-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  gap: 6px;
+}
+.ms-trigger.ms-open {
+  border-color: var(--green);
+  background: var(--surface);
+}
+.ms-placeholder {
+  color: var(--text-soft);
+}
+.ms-chevron {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.ms-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+  overflow: hidden;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.ms-item {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.ms-item:hover {
+  background: var(--surface-2);
+}
+.ms-item.ms-selected {
+  color: var(--green);
+  font-weight: 600;
 }

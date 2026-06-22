@@ -65,6 +65,10 @@ export class TeamSettings {
   @Column({ type: 'int', default: 5 })
   late_threshold_minutes!: number;
 
+  // 지각 최대 인정 시간(분) — 회의 시작 후 이 시간 초과 입장 시 '결석'(0이면 상한 없음, 표시용)
+  @Column({ type: 'int', default: 0 })
+  late_max_minutes!: number;
+
   @Column({ type: 'varchar', length: 200, nullable: true })
   slack_bot_token!: string | null;
 

@@ -19,6 +19,7 @@ import { UpdateTeamDto } from './dto/update-team.dto';
 import { JoinTeamDto } from './dto/join-team.dto';
 import { UpdateTeamSettingsDto } from './dto/update-team-settings.dto';
 import { TransferLeaderDto } from './dto/transfer-leader.dto';
+import { UpdateNicknameDto } from './dto/update-nickname.dto';
 
 @ApiTags('팀')
 @Controller('teams')
@@ -98,6 +99,22 @@ export class TeamsController {
   }
 
   // 주의: ':id/members/:userId'보다 먼저 선언해야 'me'가 숫자 파라미터로 매칭되지 않음
+  @Patch(':id/members/me/nickname')
+  @ApiOperation({
+    summary: '그룹 내 닉네임 설정 (본인), null이면 카카오 이름으로 복원',
+  })
+  updateNickname(
+    @Param('id', ParseIntPipe) teamId: number,
+    @Request() req: { user: { id: number } },
+    @Body() dto: UpdateNicknameDto,
+  ) {
+    return this.teamsService.updateNickname(
+      req.user.id,
+      teamId,
+      dto.nickname ?? null,
+    );
+  }
+
   @Delete(':id/members/me')
   @ApiOperation({ summary: '팀 탈퇴 (본인) — 팀장은 위임 후 가능' })
   leave(

@@ -62,6 +62,7 @@ export class MeetingAbsencesService {
       : [];
 
     const lateThreshold = await this.lateThresholdMinutes(meeting.team_id);
+    const lateMax = await this.lateMaxMinutes(meeting.team_id);
     const joined = this.joinedUserIds(presence);
     const scoreByUser = new Map(scores.map((s) => [Number(s.user_id), s]));
     const absenceByUser = new Map(absences.map((a) => [Number(a.user_id), a]));
@@ -88,11 +89,18 @@ export class MeetingAbsencesService {
           m.user_id,
           lateThreshold,
         );
+        const exceedsMax = this.exceedsMaxLate(
+          meeting,
+          presence,
+          m.user_id,
+          lateMax,
+        );
         const status = this.deriveStatus(
           joined.has(m.user_id),
           score,
           absence,
           lateByPresence,
+          exceedsMax,
         );
         const aid = absence ? Number(absence.id) : null;
         return {
@@ -128,6 +136,7 @@ export class MeetingAbsencesService {
     });
     if (meetings.length === 0) return [];
     const lateThreshold = await this.lateThresholdMinutes(teamId);
+    const lateMax = await this.lateMaxMinutes(teamId);
     const ids = meetings.map((m) => m.id);
     const [myScores, myPresence, allPresence, absences, myConsents] =
       await Promise.all([
@@ -175,11 +184,18 @@ export class MeetingAbsencesService {
         userId,
         lateThreshold,
       );
+      const exceedsMax = this.exceedsMaxLate(
+        m,
+        myPresenceForMeeting,
+        userId,
+        lateMax,
+      );
       const status = this.deriveStatus(
         myJoined.has(mid),
         myScoreByMeeting.get(mid),
         myAbsence,
         lateByPresence,
+        exceedsMax,
       );
       // 내가 처리(동의)해야 할 미처리 결석 사유 — pending · 본인 것 아님 · 아직 미동의
       const pendingCount = absences.filter(
@@ -521,8 +537,9 @@ export class MeetingAbsencesService {
     score: ContributionScore | undefined,
     absence: MeetingAbsence | undefined,
     lateByPresence = false,
+    exceedsMaxLate = false,
   ): AttendanceStatus {
-    if (!hasJoined) {
+    if (!hasJoined || exceedsMaxLate) {
       return absence?.status === 'approved' ? 'excused' : 'absent';
     }
     if (lateByPresence) return 'late';
@@ -549,12 +566,41 @@ export class MeetingAbsencesService {
     return Math.max(0, firstOffset) / 1000 > thresholdMinutes * 60;
   }
 
+  // 지각 최대 인정 시간(분) 초과 입장 여부 — maxLateMinutes가 0이면 상한 없음(항상 false)
+  private exceedsMaxLate(
+    meeting: Meeting,
+    presence: PresenceEvent[],
+    userId: number,
+    maxLateMinutes: number,
+  ): boolean {
+    if (maxLateMinutes <= 0) return false;
+    if (!meeting.t0_timestamp) return false;
+    const joins = presence
+      .filter(
+        (p) =>
+          Number(p.user_id) === userId &&
+          (p.event_type === 'join' || p.event_type === 'reconnect'),
+      )
+      .map((p) => p.timestamp_offset_ms);
+    if (joins.length === 0) return false;
+    const firstOffset = Math.min(...joins);
+    return Math.max(0, firstOffset) / 1000 > maxLateMinutes * 60;
+  }
+
   // 팀의 지각 기준(분) — 설정이 없으면 기본 5분
   private async lateThresholdMinutes(teamId: number): Promise<number> {
     const settings = await this.settingsRepo.findOne({
       where: { team_id: teamId },
     });
     return settings?.late_threshold_minutes ?? 5;
+  }
+
+  // 팀의 지각 최대 인정 시간(분) — 설정이 없으면 0(상한 없음)
+  private async lateMaxMinutes(teamId: number): Promise<number> {
+    const settings = await this.settingsRepo.findOne({
+      where: { team_id: teamId },
+    });
+    return settings?.late_max_minutes ?? 0;
   }
 
   // 그 회의에 입장(join/reconnect) 기록이 있는 user 집합

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
+import { avatarBg, memberColor } from "@/lib/avatarColor";
 import { todayStr, timeMinForDate } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
+import MemberSelect from "@/components/MemberSelect";
 import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type { ActionItem, TeamContribution, ActionItemLog } from "@/lib/types";
@@ -173,21 +175,29 @@ export default function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, team]);
 
-  const nameOf = (id: number | null) =>
-    members.find((m) => m.user_id === id)?.name ?? "미지정";
-  const avOf = (id: number | null) => {
-    const i = members.findIndex((m) => m.user_id === id);
-    return `a${((i < 0 ? 0 : i) % 4) + 1}`;
+  const nicknameMap = new Map(
+    (team?.members ?? []).map((m) => [m.user_id, m.nickname ?? m.name]),
+  );
+  const nameToNickname = new Map(
+    (team?.members ?? []).map((m) => [m.name, m.nickname ?? m.name]),
+  );
+  const fmtLogVal = (field: string, val: string | null) => {
+    const raw = formatVal(field, val);
+    return field === "assignee" ? (nameToNickname.get(raw) ?? raw) : raw;
   };
-  const MEMBER_STRIPE = [
-    "var(--green)",
-    "var(--blue)",
-    "var(--pink)",
-    "var(--amber)",
-  ];
+  const nameOf = (id: number | null) =>
+    (id != null ? nicknameMap.get(id) : null) ??
+    members.find((m) => m.user_id === id)?.name ??
+    "미지정";
+  const avBg = (id: number | null) => {
+    if (id == null) return "linear-gradient(150deg, #c8c4bb, #a8a49b)";
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === id);
+    return avatarBg(i < 0 ? id % 32 : i);
+  };
   const colorOf = (id: number | null) => {
-    const i = members.findIndex((m) => m.user_id === id);
-    return i < 0 ? null : MEMBER_STRIPE[i % 4];
+    if (id == null) return null;
+    const i = (team?.members ?? []).findIndex((m) => m.user_id === id);
+    return memberColor(i < 0 ? id % 32 : i);
   };
   const stripeStyle = (
     assigneeId: number | null,
@@ -716,8 +726,13 @@ export default function TasksPage() {
                         <div className="tc-foot">
                           <span className="tc-who">
                             <span
-                              className={`av ${avOf(t.assignee_id)} av-sm`}
-                              style={{ width: 20, height: 20, fontSize: 9 }}
+                              className="av av-sm"
+                              style={{
+                                background: avBg(t.assignee_id),
+                                width: 20,
+                                height: 20,
+                                fontSize: 9,
+                              }}
                             >
                               {who[0]}
                             </span>
@@ -839,7 +854,10 @@ export default function TasksPage() {
                   <span className={`badge ${COL_BADGE[status] || "b-gray"}`}>
                     {status}
                   </span>
-                  <div className={`av ${avOf(t.assignee_id)} av-sm`}>
+                  <div
+                    className="av av-sm"
+                    style={{ background: avBg(t.assignee_id) }}
+                  >
                     {nameOf(t.assignee_id)[0]}
                   </div>
                   <div
@@ -968,7 +986,8 @@ export default function TasksPage() {
                           }}
                         >
                           <span style={{ fontWeight: 600, color }}>
-                            {log.actor_name}
+                            {nameToNickname.get(log.actor_name) ??
+                              log.actor_name}
                           </span>
                           <span>{fmtLogTime(log.created_at)}</span>
                         </div>
@@ -1004,14 +1023,14 @@ export default function TasksPage() {
                                 {fieldLabel(c.field)}
                               </span>
                               <span style={{ color: "var(--coral)" }}>
-                                {formatVal(c.field, c.from)}
+                                {fmtLogVal(c.field, c.from)}
                               </span>
                               <i
                                 className="ti ti-arrow-right"
                                 style={{ fontSize: 10 }}
                               />
                               <span style={{ color: "var(--green)" }}>
-                                {formatVal(c.field, c.to)}
+                                {fmtLogVal(c.field, c.to)}
                               </span>
                             </div>
                           ))}
@@ -1031,6 +1050,7 @@ export default function TasksPage() {
       {modalOpen && (
         <Modal
           title="태스크 추가"
+          className="modal-wide"
           onClose={() => setModalOpen(false)}
           actions={
             <>
@@ -1073,18 +1093,12 @@ export default function TasksPage() {
           <div className="field-row">
             <div className="field">
               <label className="field-label">담당자</label>
-              <select
-                className="input"
+              <MemberSelect
+                members={members}
+                nicknameMap={nicknameMap}
                 value={newAssignee}
-                onChange={(e) => setNewAssignee(e.target.value)}
-              >
-                <option value="">미지정</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setNewAssignee}
+              />
             </div>
             <div className="field">
               <label className="field-label">마감일</label>
@@ -1147,6 +1161,7 @@ export default function TasksPage() {
       {editTarget && !confirmDelete && (
         <Modal
           title="태스크 수정"
+          className="modal-wide"
           onClose={() => setEditTarget(null)}
           actions={
             <>
@@ -1196,18 +1211,12 @@ export default function TasksPage() {
           <div className="field-row">
             <div className="field">
               <label className="field-label">담당자</label>
-              <select
-                className="input"
+              <MemberSelect
+                members={members}
+                nicknameMap={nicknameMap}
                 value={editAssignee}
-                onChange={(e) => setEditAssignee(e.target.value)}
-              >
-                <option value="">미지정</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setEditAssignee}
+              />
             </div>
             <div className="field">
               <label className="field-label">마감일</label>
@@ -1452,7 +1461,9 @@ export default function TasksPage() {
                     >
                       {log.action === "delete" ? "삭제" : "수정"}
                     </span>
-                    <span className="log-actor">{log.actor_name}</span>
+                    <span className="log-actor">
+                      {nameToNickname.get(log.actor_name) ?? log.actor_name}
+                    </span>
                     <span className="log-date">
                       {fmtLogTime(log.created_at)}
                     </span>
@@ -1470,14 +1481,14 @@ export default function TasksPage() {
                             {fieldLabel(c.field)}
                           </span>
                           <span className="log-from">
-                            {formatVal(c.field, c.from)}
+                            {fmtLogVal(c.field, c.from)}
                           </span>
                           <i
                             className="ti ti-arrow-right"
                             style={{ fontSize: 11, color: "var(--text-mut)" }}
                           />
                           <span className="log-to">
-                            {formatVal(c.field, c.to)}
+                            {fmtLogVal(c.field, c.to)}
                           </span>
                         </div>
                       ))}

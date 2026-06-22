@@ -48,6 +48,7 @@ export class TeamsService {
       return {
         user_id: m.user_id,
         name: u?.name ?? '알 수 없음',
+        nickname: m.nickname,
         profile_image_url: u?.profile_image_url ?? null,
         role: m.role,
         joined_at: m.joined_at,
@@ -97,13 +98,19 @@ export class TeamsService {
     });
     const userMap = new Map(users.map((u) => [Number(u.id), u.name]));
 
-    const membersByTeam = new Map<number, { name: string; role: string }[]>();
+    const membersByTeam = new Map<
+      number,
+      { user_id: number; name: string; nickname: string | null; role: string }[]
+    >();
     for (const m of allMemberships) {
       const tid = Number(m.team_id);
       if (!membersByTeam.has(tid)) membersByTeam.set(tid, []);
-      membersByTeam
-        .get(tid)!
-        .push({ name: userMap.get(Number(m.user_id)) ?? '?', role: m.role });
+      membersByTeam.get(tid)!.push({
+        user_id: Number(m.user_id),
+        name: userMap.get(Number(m.user_id)) ?? '?',
+        nickname: m.nickname,
+        role: m.role,
+      });
     }
 
     const counts: { team_id: string; count: string }[] =
@@ -200,6 +207,7 @@ export class TeamsService {
         return {
           user_id: Number(m.user_id),
           name: u?.name ?? '알 수 없음',
+          nickname: m.nickname,
           profile_image_url: u?.profile_image_url ?? null,
           role: m.role,
         };
@@ -345,6 +353,14 @@ export class TeamsService {
     if (!settings) throw new NotFoundException('팀 설정을 찾을 수 없습니다.');
 
     Object.assign(settings, dto);
+    if (
+      settings.late_max_minutes !== 0 &&
+      settings.late_max_minutes < settings.late_threshold_minutes
+    ) {
+      throw new BadRequestException(
+        '지각 최대 인정 시간은 0(상한 없음) 또는 지각 기준 이상이어야 합니다.',
+      );
+    }
     await this.settingsRepo.save(settings);
 
     return this.formatSettings(settings);
@@ -365,6 +381,7 @@ export class TeamsService {
       weight_attend_in_meeting: Number(s.weight_attend_in_meeting),
       leader_bonus_multiplier: Number(s.leader_bonus_multiplier),
       late_threshold_minutes: s.late_threshold_minutes,
+      late_max_minutes: s.late_max_minutes,
       slack_bot_token: s.slack_bot_token,
       slack_channel_id: s.slack_channel_id,
     };
@@ -392,6 +409,18 @@ export class TeamsService {
     return Array.from(bytes)
       .map((b) => chars[b % 36])
       .join('');
+  }
+
+  // 그룹 내 닉네임 설정 (본인만, null 저장 시 카카오 이름으로 복원)
+  async updateNickname(
+    userId: number,
+    teamId: number,
+    nickname: string | null,
+  ) {
+    const membership = await this.requireMembership(userId, teamId);
+    membership.nickname = nickname?.trim() || null;
+    await this.membershipRepo.save(membership);
+    return { nickname: membership.nickname };
   }
 
   // 팀 탈퇴 (본인) — 팀장은 위임 후에만 가능, 마지막 1인이 나가면 팀도 정리

@@ -23,6 +23,9 @@ export class TeamMembership {
   @Column({ type: 'enum', enum: ['leader', 'member'], default: 'member' })
   role!: 'leader' | 'member';
 
+  @Column({ type: 'varchar', length: 50, nullable: true, default: null })
+  nickname!: string | null;
+
   @Column({ type: 'datetime' })
   joined_at!: Date;
 

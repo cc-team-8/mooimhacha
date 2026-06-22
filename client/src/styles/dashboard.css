@@ -164,6 +164,16 @@
   font-size: 12px;
   font-weight: 600;
 }
+.sb-mname {
+  flex: 1;
+  min-width: 0;
+}
+.sb-mname > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .me-tag {
   font-size: 9.5px;
   font-weight: 700;
@@ -171,6 +181,9 @@
   color: var(--green);
   padding: 1px 6px;
   border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 .leader-tag {
   font-size: 9.5px;
@@ -179,6 +192,9 @@
   color: #b8860b;
   padding: 1px 6px;
   border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 .sb-spacer {
   flex: 1;
@@ -199,6 +215,65 @@
 .sb-user-role {
   font-size: 10.5px;
   color: var(--text-soft);
+}
+.sb-nick-edit-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-soft);
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+.sb-nick-edit-btn:hover {
+  color: var(--green);
+}
+.sb-nick-edit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sb-nick-input {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  padding: 3px 7px;
+  width: 100%;
+  outline: none;
+  box-sizing: border-box;
+}
+.sb-nick-actions {
+  display: flex;
+  gap: 4px;
+}
+.sb-nick-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-soft);
+  font-size: 12px;
+  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.sb-nick-btn:hover {
+  color: var(--green);
+  border-color: var(--green);
 }
 
 .main-area {
@@ -352,6 +427,12 @@
   font-weight: 600;
   width: 62px;
   flex: 0 0 auto;
+}
+.c-name > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .c-bar {
   flex: 1;
@@ -1843,14 +1924,37 @@
   position: relative;
 }
 
+/* 멤버 블록 = 레이더+막대 행(.mrc) + 그 아래 개인 완료 태스크(.mrc-tasks) */
+.mrc-block {
+  position: relative;
+  padding: 14px 0 14px 14px;
+}
+.mrc-block + .mrc-block {
+  box-shadow: inset 0 1px 0 var(--border-2);
+}
+/* 팀원 구분용 좌측 색상 바 — 멤버별 색, 위아래 여백으로 각 멤버 분리 */
+.mrc-side {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 4px;
+}
 .mrc {
-  padding: 14px 0;
   display: flex;
   align-items: center;
   gap: 16px;
 }
-.mrc + .mrc {
-  box-shadow: inset 0 1px 0 var(--border-2);
+/* 개인 완료 태스크 — 레이더·바 아래에 표기 */
+.mrc-tasks {
+  margin-top: 2px;
+  padding-left: 8px;
+}
+.mrc-tasks-empty {
+  font-size: 10px;
+  color: var(--text-soft);
+  padding: 6px 0;
 }
 /* 왼쪽 레이더(1) : 오른쪽 막대(3) */
 .mrc-radar {
@@ -1956,24 +2060,24 @@
   border-radius: 4px;
 }
 
-/* 내가 완료한 태스크 목록 */
+/* 완료 태스크 목록 (멤버별) — 1/2 축소분의 150% */
 /* 난이도 · 이름 · 세부사항 · 기한 4열 — 행마다 동일 간격으로 정렬 */
 .mdt-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) minmax(0, 3fr) 46px;
+  grid-template-columns: 33px minmax(0, 1fr) minmax(0, 3fr) 39px;
   align-items: start;
-  column-gap: 12px;
-  padding: 9px 0;
-  font-size: 12.5px;
+  column-gap: 9px;
+  padding: 6px 0;
+  font-size: 10.5px;
 }
 .mdt-row + .mdt-row {
   box-shadow: inset 0 1px 0 var(--border-2);
 }
 .mdt-head {
-  padding: 0 0 6px;
+  padding: 0 0 4px;
 }
 .mdt-head span {
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--text-soft);
 }
@@ -1982,8 +2086,8 @@
 }
 .mdt-stars {
   color: var(--amber);
-  font-size: 11px;
-  letter-spacing: 1px;
+  font-size: 9px;
+  letter-spacing: 0.75px;
   white-space: nowrap;
 }
 .mdt-desc {
@@ -1995,7 +2099,7 @@
 }
 .mdt-detail {
   min-width: 0;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1.5;
   color: var(--text-soft);
   white-space: pre-wrap;
@@ -2003,7 +2107,7 @@
 }
 .mdt-date {
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 9px;
   text-align: right;
   white-space: nowrap;
 }
@@ -2050,6 +2154,12 @@
   margin-top: 4px;
 }
 
+/* PDF(인쇄) 외곽 흰 여백 제거 — 브라우저 기본 인쇄 여백(~0.4in)을 0으로.
+   여백을 없애 내용이 페이지를 꽉 채우고 가장자리에 빈 흰 띠가 생기지 않게 한다 */
+@page {
+  margin: 0;
+}
+
 @media print {
   :root {
     --ambient: #ffffff;
@@ -2062,6 +2172,13 @@
   .main-top,
   .report-wrap > div:first-child {
     display: none !important;
+  }
+
+  /* 앱 최상위 래퍼의 height:100vh·overflow:hidden 이 리포트를 한 화면으로 잘라
+     인쇄 시 1페이지만 나오던 문제 해제 */
+  .app {
+    height: auto !important;
+    overflow: visible !important;
   }
 
   .dash-shell {
@@ -2081,6 +2198,15 @@
   .report-wrap {
     max-width: 100% !important;
     margin: 0 !important;
+  }
+
+  /* 여백이 0이라 페이지 경계가 종이 끝이므로, 작은 블록은 쪼개지지 않게 해
+     글자가 페이지 가장자리에 잘려 걸리는 것을 막는다 (큰 카드는 분할 허용) */
+  .mrc-block,
+  .mdt-row,
+  .ms-row,
+  .card-head {
+    break-inside: avoid;
   }
 
   * {

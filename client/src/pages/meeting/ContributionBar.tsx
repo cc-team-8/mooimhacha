@@ -2,17 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import type { TeamMember } from "@/lib/types";
 import type { ContributionScoreLive } from "@/lib/ws";
-
-// 실시간 기여도 바 (★) — 회의 중 발언 비중 한 축만 표시.
-// 막대 = 비율(%), 라벨 = 절대 글자수. WebSocket 1초 디바운스로 갱신.
-const BAR_COLORS = [
-  "var(--green)",
-  "var(--blue)",
-  "var(--violet)",
-  "var(--amber)",
-  "var(--coral)",
-  "var(--pink)",
-];
+import { memberColor } from "@/lib/avatarColor";
 
 interface Props {
   scores: ContributionScoreLive[];
@@ -29,8 +19,14 @@ export default function ContributionBar({
 }: Props) {
   const [collapsed, setCollapsed] = useState(true);
 
-  const nameOf = (id: number) =>
-    members.find((m) => m.user_id === id)?.name ?? `사용자 ${id}`;
+  const nameOf = (id: number) => {
+    const m = members.find((m) => m.user_id === id);
+    return m ? (m.nickname ?? m.name) : `사용자 ${id}`;
+  };
+  const memberIdx = (id: number) => {
+    const i = members.findIndex((m) => m.user_id === id);
+    return i < 0 ? id % 32 : i;
+  };
 
   const byUser = new Map(scores.map((s) => [s.user_id, s]));
   const allRows = members
@@ -70,31 +66,26 @@ export default function ContributionBar({
         </span>
       </header>
       <div className="cmp-bars">
-        {rows.map((row, i) => {
-          const globalIdx = allRows.findIndex((r) => r.user_id === row.user_id);
-          return (
-            <div className="cmp-bar-row" key={row.user_id}>
-              <span className="cmp-bar-name">
-                {speaking.has(row.user_id) && (
-                  <span className="cmp-mic">🎤</span>
-                )}
-                {nameOf(row.user_id)}
-              </span>
-              <div className="cmp-bar-track">
-                <motion.div
-                  className="cmp-bar-fill"
-                  style={{
-                    background: BAR_COLORS[globalIdx % BAR_COLORS.length],
-                  }}
-                  initial={false}
-                  animate={{ width: `${Math.round(row.ratio * 100)}%` }}
-                  transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                />
-              </div>
-              <span className="cmp-bar-count">{row.char_count}자</span>
+        {rows.map((row) => (
+          <div className="cmp-bar-row" key={row.user_id}>
+            <span className="cmp-bar-name" data-tooltip={nameOf(row.user_id)}>
+              {speaking.has(row.user_id) && <span className="cmp-mic">🎤</span>}
+              <span className="cmp-bar-name-text">{nameOf(row.user_id)}</span>
+            </span>
+            <div className="cmp-bar-track">
+              <motion.div
+                className="cmp-bar-fill"
+                style={{
+                  background: memberColor(memberIdx(row.user_id)),
+                }}
+                initial={false}
+                animate={{ width: `${Math.round(row.ratio * 100)}%` }}
+                transition={{ type: "spring", stiffness: 120, damping: 20 }}
+              />
             </div>
-          );
-        })}
+            <span className="cmp-bar-count">{row.char_count}자</span>
+          </div>
+        ))}
         {rows.length === 0 && (
           <p className="cmp-empty">아직 발언이 없습니다.</p>
         )}

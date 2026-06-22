@@ -102,6 +102,17 @@ export class UpdateTeamSettingsDto {
   @Max(240)
   late_threshold_minutes?: number;
 
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 240,
+    description: '지각 최대 인정 시간(분) — 초과 입장 시 결석. 0이면 상한 없음',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(240)
+  late_max_minutes?: number;
+
   @ApiPropertyOptional({ example: 'xoxb-...', description: 'Slack Bot Token' })
   @IsOptional()
   @IsString()

@@ -302,12 +302,17 @@ body {
   width: 64px;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: flex;
   align-items: center;
   gap: 3px;
+  position: relative;
+}
+.cmp-bar-name-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 .cmp-bar-track {
   flex: 1;
