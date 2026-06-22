@@ -22,7 +22,7 @@ interface Window {
               content: {
                 title: string;
                 description: string;
-                imageUrl: string;
+                imageUrl?: string;
                 link: { mobileWebUrl: string; webUrl: string };
               };
               buttons?: {
