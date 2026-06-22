@@ -61,7 +61,7 @@ const ATT_BADGE: Record<
     color: "var(--green)",
     bg: "var(--green-soft)",
   },
-  late: { label: "지각", color: "#b8860b", bg: "rgba(240,193,79,.18)" },
+  late: { label: "지각", color: "var(--amber)", bg: "var(--amber-soft)" },
   absent: { label: "결석", color: "var(--coral)", bg: "var(--coral-soft)" },
 };
 
@@ -988,7 +988,6 @@ export default function MeetingPage() {
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 className="btn btn-primary btn-sm"
-                style={{ background: "var(--green)", color: "#fff" }}
                 onClick={() => setModalOpen("quickstart")}
                 title="지금 바로 회의 시작"
               >
@@ -1382,7 +1381,13 @@ export default function MeetingPage() {
                   <div className="tab-panel active">
                     <div
                       className="panel-label"
-                      style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
                       onClick={() => setSpeakDistOpen((v) => !v)}
                     >
                       발언 분포{" "}
@@ -1405,7 +1410,10 @@ export default function MeetingPage() {
                         }}
                       >
                         {speakDistOpen ? "글자 수 기준" : "접힘"}
-                        <i className={`ti ${speakDistOpen ? "ti-chevron-up" : "ti-chevron-down"}`} style={{ fontSize: 13 }} />
+                        <i
+                          className={`ti ${speakDistOpen ? "ti-chevron-up" : "ti-chevron-down"}`}
+                          style={{ fontSize: 13 }}
+                        />
                       </span>
                     </div>
                     {speakDistOpen && (
@@ -1450,7 +1458,9 @@ export default function MeetingPage() {
                               </span>
                               <span
                                 className="speak-pct"
-                                style={warn ? { color: "var(--coral)" } : undefined}
+                                style={
+                                  warn ? { color: "var(--coral)" } : undefined
+                                }
                               >
                                 {s.speech_ratio == null ? "—" : `${pct}%`}
                               </span>
@@ -1473,7 +1483,8 @@ export default function MeetingPage() {
                             {lowSpeakers
                               .map((s) => nicknameMap.get(s.user_id) ?? s.name)
                               .join(", ")}
-                            님의 발언 비중이 10% 미만입니다. 의견을 물어봐 주세요.
+                            님의 발언 비중이 10% 미만입니다. 의견을 물어봐
+                            주세요.
                           </div>
                         )}
                       </>
