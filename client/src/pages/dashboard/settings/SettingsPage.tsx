@@ -66,6 +66,7 @@ export default function SettingsPage() {
   // 숫자 입력 편집 중 임시 문자열 — 빈 값·소수점 중간 입력을 허용하기 위함
   const [numDraft, setNumDraft] = useState<Record<string, string>>({});
   const [showPenaltyInfo, setShowPenaltyInfo] = useState(false);
+  const [showSlackInfo, setShowSlackInfo] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -1039,7 +1040,66 @@ export default function SettingsPage() {
           {isLeader && settings && (
             <>
               <div className="field">
-                <label className="field-label">워크스페이스 연결</label>
+                <label
+                  className="field-label"
+                  style={{ display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  워크스페이스 연결
+                  <span
+                    style={{
+                      position: "relative",
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                    onMouseEnter={() => setShowSlackInfo(true)}
+                    onMouseLeave={() => setShowSlackInfo(false)}
+                  >
+                    <i
+                      className="ti ti-info-circle"
+                      style={{
+                        fontSize: 15,
+                        color: "var(--text-soft)",
+                        cursor: "default",
+                      }}
+                    />
+                    {showSlackInfo && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 6px)",
+                          left: 0,
+                          background: "var(--surface-2)",
+                          border: "1px solid var(--border-2)",
+                          borderRadius: 10,
+                          padding: "10px 12px",
+                          fontSize: 12,
+                          color: "var(--text-soft)",
+                          lineHeight: 1.7,
+                          whiteSpace: "nowrap",
+                          zIndex: 100,
+                          boxShadow: "0 4px 12px rgba(0,0,0,.12)",
+                        }}
+                      >
+                        슬랙 채널 ID를 입력하고 저장 버튼을 누른 뒤,
+                        <br />
+                        Add to Slack을 눌러서 원하는 워크스페이스에 연결하세요.
+                        <br />
+                        이후 원하는 채널에서{" "}
+                        <code
+                          style={{
+                            background: "var(--surface-3)",
+                            borderRadius: 4,
+                            padding: "1px 5px",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          /invite @무임하차
+                        </code>
+                        를 입력하면 봇을 초대할 수 있습니다.
+                      </div>
+                    )}
+                  </span>
+                </label>
                 {settings.slack_bot_token ? (
                   <div style={{ display: "flex", gap: 8 }}>
                     <div
