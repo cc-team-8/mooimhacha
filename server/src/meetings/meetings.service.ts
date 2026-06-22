@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
 import { Meeting } from '../entities/meeting.entity';
 import { Team } from '../entities/team.entity';
@@ -65,6 +66,7 @@ export class MeetingsService {
     private slackService: SlackService,
     private meetingEvents: MeetingEvents,
     private dataSource: DataSource,
+    private config: ConfigService,
   ) {}
 
   async create(userId: number, dto: CreateMeetingDto) {
@@ -174,6 +176,8 @@ export class MeetingsService {
         .findOne({ where: { id: meeting.team_id } }),
     ]);
     if (!settings?.slack_bot_token || !settings.slack_channel_id) return;
+    const clientUrl = this.config.get<string>('CLIENT_URL') ?? '';
+    const meetingUrl = `${clientUrl}/dashboard/${meeting.team_id}/meeting`;
     await this.slackService.sendChannelMessage(
       settings.slack_bot_token,
       settings.slack_channel_id,
@@ -181,6 +185,7 @@ export class MeetingsService {
         `🚀 *회의 시작* — ${team?.name ?? '팀'}`,
         `> *${meeting.topic ?? '회의'}*`,
         `> 지금 바로 참여해주세요!`,
+        `<${meetingUrl}|출결 현황 보기 →>`,
       ].join('\n'),
     );
   }

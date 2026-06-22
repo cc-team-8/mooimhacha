@@ -413,7 +413,7 @@ export class MeetingAbsencesService {
     const userName = user?.name ?? '팀원';
     const meetingTopic = meeting.topic ?? '회의';
     const clientUrl = this.config.get<string>('CLIENT_URL') ?? '';
-    const attendanceUrl = `${clientUrl}/meetings/${meeting.id}/attendance`;
+    const attendanceUrl = `${clientUrl}/dashboard/${meeting.team_id}/meeting`;
 
     if (settings.slack_channel_id) {
       await this.slackService.sendChannelMessage(
@@ -518,7 +518,7 @@ export class MeetingAbsencesService {
     );
     const label = isLate ? '지각' : '결석';
     const clientUrl = this.config.get<string>('CLIENT_URL') ?? '';
-    const attendanceUrl = `${clientUrl}/meetings/${meeting.id}/attendance`;
+    const attendanceUrl = `${clientUrl}/dashboard/${meeting.team_id}/meeting`;
     await this.slackService.sendDm(
       settings.slack_bot_token,
       user.slack_user_id,

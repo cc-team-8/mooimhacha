@@ -172,6 +172,8 @@ export class NotificationsService {
         this.teamRepo.findOne({ where: { id: task.team_id } }),
       ]);
       if (user?.slack_user_id && settings?.slack_bot_token) {
+        const clientUrl = this.config.get<string>('CLIENT_URL') ?? '';
+        const taskUrl = `${clientUrl}/dashboard/${task.team_id}/tasks`;
         await this.slackService.sendDm(
           settings.slack_bot_token,
           user.slack_user_id,
@@ -179,6 +181,7 @@ export class NotificationsService {
             `⏰ *태스크 마감 D-1* — ${team?.name ?? '팀'}`,
             `> ${task.description}`,
             `> 내일까지 완료해주세요`,
+            `<${taskUrl}|태스크 목록 보기 →>`,
           ].join('\n'),
         );
       }
@@ -220,6 +223,8 @@ export class NotificationsService {
         this.teamRepo.findOne({ where: { id: m.team_id } }),
       ]);
       if (settings?.slack_bot_token && settings.slack_channel_id) {
+        const clientUrl = this.config.get<string>('CLIENT_URL') ?? '';
+        const meetingUrl = `${clientUrl}/dashboard/${m.team_id}/meeting`;
         await this.slackService.sendChannelMessage(
           settings.slack_bot_token,
           settings.slack_channel_id,
@@ -227,6 +232,7 @@ export class NotificationsService {
             `📢 *회의 30분 전* — ${team?.name ?? '팀'}`,
             `> *${m.topic ?? '회의'}*`,
             `> 잠시 후 시작됩니다. 준비해주세요!`,
+            `<${meetingUrl}|출결 현황 보기 →>`,
           ].join('\n'),
         );
       }
