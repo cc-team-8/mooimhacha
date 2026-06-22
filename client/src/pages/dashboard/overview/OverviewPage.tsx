@@ -213,7 +213,9 @@ export default function OverviewPage() {
       const at = pct(m.attendance_avg);
       const ts = pct(m.task_score);
       if (sp == null && at == null && ts == null) return null;
-      return Math.round((sp ?? 0) * wSpeech + (at ?? 0) * wAttend + (ts ?? 0) * wTask);
+      return Math.round(
+        (sp ?? 0) * wSpeech + (at ?? 0) * wAttend + (ts ?? 0) * wTask,
+      );
     };
     return contrib
       .map((c) => ({ c, score: scoreOf(c) }))
@@ -261,6 +263,19 @@ export default function OverviewPage() {
 
   return (
     <div>
+      {derived.overdue.length > 0 && (
+        <div className="alert-bar critical">
+          <i className="ti ti-clock-x" />{" "}
+          {(() => {
+            const name = derived.nameById.get(
+              derived.overdue[0].assignee_id ?? -1,
+            );
+            return name
+              ? `${name}님의 태스크 ${derived.overdue.length}개가 기한을 초과했습니다.`
+              : `기한 초과 태스크가 ${derived.overdue.length}개 있습니다.`;
+          })()}
+        </div>
+      )}
       {derived.urgent.length > 0 ? (
         <div className="alert-bar" data-tour="ov-alert">
           <i className="ti ti-alert-triangle" />{" "}

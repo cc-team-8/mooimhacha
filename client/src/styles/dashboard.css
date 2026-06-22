@@ -379,6 +379,10 @@
   font-weight: 600;
   margin-bottom: 16px;
 }
+.alert-bar.critical {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
 .alert-bar .ti {
   font-size: 17px;
 }
