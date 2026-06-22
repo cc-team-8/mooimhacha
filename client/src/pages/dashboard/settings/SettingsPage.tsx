@@ -207,24 +207,13 @@ export default function SettingsPage() {
       return;
     }
     window.Kakao.Share.sendDefault({
-      objectType: "feed",
-      content: {
-        title: `${me?.name ?? "팀원"}님이 초대하셨어요 🎉`,
-        description: `🏷 ${team.name}\n🔑 초대코드: ${detail.invite_code}`,
-        link: {
-          mobileWebUrl: window.location.origin,
-          webUrl: window.location.origin,
-        },
+      objectType: "text",
+      text: `${me?.name ?? "팀원"}님이 초대하셨어요 🎉\n🏷 ${team.name}\n🔑 초대코드: ${detail.invite_code}`,
+      link: {
+        mobileWebUrl: window.location.origin,
+        webUrl: window.location.origin,
       },
-      buttons: [
-        {
-          title: "지금 합류하기",
-          link: {
-            mobileWebUrl: window.location.origin,
-            webUrl: window.location.origin,
-          },
-        },
-      ],
+      buttonTitle: "지금 합류하기",
     });
   }
 
