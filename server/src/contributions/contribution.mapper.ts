@@ -16,6 +16,8 @@ export interface ExternalTeamSettings {
   weight_attend_in_meeting: number;
   weight_task_in_final: number;
   punctuality_grace_ratio: number;
+  late_threshold_sec: number | null;
+  late_max_sec: number | null;
   absence_grace_sec: number;
   leader_bonus: number;
   action_chars_limit: number;
@@ -36,6 +38,7 @@ export interface ExternalMemberMeetingData {
   audio_loss_pct: number;
   speech_confidence: number;
   excused_absence: boolean;
+  excused_late: boolean;
   absent: boolean;
   is_official: boolean;
   // ③ 테스크 입력 — pipeline 은 회의 행에 동봉된 액션을 모아(collect_actions) 계산한다
@@ -56,6 +59,24 @@ export interface ExternalCumulativeScoreResponse {
   excluded_count: number;
 }
 
+// 단일 회의 상세 점수 — attend_score는 출석비율+지각 페널티(사유 지각 면제 포함)가
+// 반영된 값. attendance_ratio(순수 참여시간 비율)와 달리 지각 여부를 실제로 반영하므로
+// 화면의 "출석" 표시는 이 값을 써야 한다.
+export interface ExternalMeetingScoreResponse {
+  name: string;
+  meeting_id: string;
+  meeting_total_sec: number;
+  speech_score: number | null;
+  attend_score: number | null;
+  meeting_contribution: number;
+  reliability: string;
+  low_attend_flag: boolean;
+  weights_used: Record<string, number>;
+  is_official: boolean;
+  excused_absence: boolean;
+  absent: boolean;
+}
+
 export interface ExternalTaskScoreResponse {
   name: string;
   score: number | null;
@@ -74,12 +95,14 @@ export interface ExternalFinalScoreResponse {
   leader_applied: boolean;
 }
 
-// /pipeline/score 응답 — meeting 은 보낸 회의들의 누적(②) 결과
+// /pipeline/score 응답 — meeting 은 보낸 회의들의 누적(②) 결과,
+// meeting_scores 는 보낸 각 회의의 단일 회의 상세(① 수준 — attend_score 등)
 export interface ExternalFullPipelineResponse {
   name: string;
   meeting: ExternalCumulativeScoreResponse;
   task: ExternalTaskScoreResponse;
   final: ExternalFinalScoreResponse;
+  meeting_scores: ExternalMeetingScoreResponse[];
 }
 
 // --- 변환 함수 ---
@@ -88,11 +111,18 @@ export interface ExternalFullPipelineResponse {
 // (외부 엔진 기본값 0.75/0.25 미사용 — 로컬 폴백 스코어러와 결과 일관성 유지).
 export function mapTeamSettings(s: TeamSettingsPayload): ExternalTeamSettings {
   const curve = s.deadline_penalty_curve ?? 'standard';
+  const lateThresholdMin = s.late_threshold_minutes ?? 5;
+  const lateMaxMin = s.late_max_minutes ?? 0;
   return {
     weight_speech_in_meeting: s.weight_speech_in_meeting ?? 0.6,
     weight_attend_in_meeting: s.weight_attend_in_meeting ?? 0.4,
     weight_task_in_final: s.final_task_weight ?? 0.5,
     punctuality_grace_ratio: s.punctuality_grace_ratio ?? 0.1,
+    // 지각 기준(분) → 초. 엔진의 신(新) 절대시간 기준 로직을 켠다.
+    late_threshold_sec: lateThresholdMin * 60,
+    // 지각 최대 인정 시간(분) → 초. 0(상한 없음)이면 null 전달 — 엔진이 점근적
+    // 감쇠로 처리한다(0으로 즉시 떨어뜨리지 않고 계속 완만하게 감점).
+    late_max_sec: lateMaxMin > 0 ? lateMaxMin * 60 : null,
     absence_grace_sec: s.presence_grace_seconds ?? 30,
     // 우리는 배율(final×n), 외부는 가산(final×(1+n)) — 1 미만 배율은 표현 불가라 0 클램프
     leader_bonus: Math.max(0, (s.leader_bonus_multiplier ?? 1) - 1),
@@ -114,9 +144,12 @@ function meetingDurationMs(m: MeetingRawInput['meeting']): number {
 
 // 한 참여자의 원시 이벤트를 외부 MemberMeetingData(파생 지표)로 변환.
 // rawSpeechRatio(own/total)는 UI 발언 비중 바 저장용 — 외부 speech_score 는 1/N 정규화 점수라 별개.
+// excusedLate: 이 회의에 대해 본인의 지각 사유가 팀원 과반 동의로 승인된 경우 true.
+// 승인되면 엔진이 지각 감점(정시 점수)만 면제하고 출석 비율은 그대로 반영한다.
 export function deriveMemberData(
   req: MeetingRawInput,
   userId: number,
+  excusedLate = false,
 ): { data: ExternalMemberMeetingData; rawSpeechRatio: number | null } {
   const s = req.team_settings;
   const maxChars = s.max_utterance_chars ?? 500;
@@ -210,7 +243,8 @@ export function deriveMemberData(
       team_size: req.participant_user_ids.length,
       audio_loss_pct: lossDenom > 0 ? (capLoss / lossDenom) * 100 : 0,
       speech_confidence: confCount > 0 ? confSum / confCount : 1.0,
-      excused_absence: false, // 사유 결석은 점수에 반영하지 않음 (출결 표시 전용)
+      excused_absence: false, // 사유 결석은 absent_user_ids 보호로 처리 (출결 표시 전용 필드)
+      excused_late: excusedLate,
       absent,
       is_official: req.meeting.meeting_type === 'regular',
     },

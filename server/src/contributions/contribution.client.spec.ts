@@ -74,6 +74,7 @@ const RAW_MEETING: TeamPipelineRequest['meetings'][number] = {
   team_settings: SETTINGS,
   participant_user_ids: [1, 2],
   absent_user_ids: [],
+  excused_late_user_ids: [],
   utterances: MEETING_REQ.utterances,
   presence_events: MEETING_REQ.presence_events,
   anomaly_events: [],
@@ -131,6 +132,10 @@ const pipelineResponse = (
       final: number;
       weights_used: Record<string, number>;
     }>;
+    meeting_scores?: Partial<{
+      attend_score: number | null;
+      absent: boolean;
+    }>[];
   } = {},
 ) => ({
   name: '1',
@@ -158,6 +163,9 @@ const pipelineResponse = (
     leader_applied: false,
     ...over.final,
   },
+  // computeMeetingScores()가 attendance_ratio로 가져다 쓰는 단일 회의 상세값.
+  // 기본값(1.0)은 기존 테스트의 "정시 입장·완전 참석" 가정과 맞춘다.
+  meeting_scores: over.meeting_scores ?? [{ attend_score: 1.0, absent: false }],
 });
 
 function mockPipeline(body: unknown): jest.SpyInstance {
@@ -204,7 +212,7 @@ describe('ContributionClient — 외부 기여도 API(/pipeline/score) 연동', 
     expect(res!.scores).toHaveLength(2);
     const u1 = res!.scores.find((s) => s.user_id === 1)!;
     expect(u1.meeting_score).toBe(0.94); // 회의 1건 누적 = 그 회의 점수
-    expect(u1.attendance_ratio).toBe(1.0); // 로컬 파생 (attend/total)
+    expect(u1.attendance_ratio).toBe(1.0); // 엔진 응답의 attend_score(meeting_scores[0])
     expect(u1.confidence_level).toBeNull(); // pipeline 미제공
     expect(u1.speech_ratio).toBeCloseTo(0.75); // 300/400 원시 비율
   });
@@ -230,6 +238,102 @@ describe('ContributionClient — 외부 기여도 API(/pipeline/score) 연동', 
     const res = await client.computeMeetingScores(MEETING_REQ);
 
     expect(res!.scores[0].meeting_score).toBeNull();
+  });
+
+  it('①: punctuality_score는 하드코딩 5분이 아니라 팀 설정의 late_threshold_minutes를 따른다', async () => {
+    fetchMock = mockPipeline(pipelineResponse());
+    const client = makeClient('http://contrib.test');
+
+    // SETTINGS.late_threshold_minutes=5(300초). user 1은 4분(240초) 지각 → 기준 이내 → 1.0
+    const req: MeetingScoreRequest = {
+      ...MEETING_REQ,
+      presence_events: [
+        {
+          user_id: 1,
+          event_type: 'join',
+          disconnect_classification: null,
+          timestamp_offset_ms: 240_000,
+        },
+        MEETING_REQ.presence_events[1],
+      ],
+    };
+    const res = await client.computeMeetingScores(req);
+    const u1 = res!.scores.find((s) => s.user_id === 1)!;
+    expect(u1.punctuality_score).toBe(1.0);
+
+    // late_threshold_minutes를 1분으로 바꾸면 같은 4분 지각이 기준 초과로 바뀐다
+    const reqShortThreshold: MeetingScoreRequest = {
+      ...req,
+      team_settings: { ...SETTINGS, late_threshold_minutes: 1 },
+    };
+    const res2 = await client.computeMeetingScores(reqShortThreshold);
+    const u1b = res2!.scores.find((s) => s.user_id === 1)!;
+    expect(u1b.punctuality_score).toBe(0.0);
+  });
+
+  it('①: attendance_ratio는 엔진의 attend_score를 그대로 쓴다 (지각해도 100%로 뜨지 않음)', async () => {
+    // 엔진이 지각 페널티를 반영해 attend_score=0.65를 줬다면, 화면 표시값인
+    // attendance_ratio도 그 값을 그대로 받아야 한다. 과거엔 actual_attend_sec
+    // (자발적 자리비움만 차감, 지각 시간은 차감하지 않음)을 직접 나눈 값을 써서
+    // 지각해도 100%로 표시되는 버그가 있었다.
+    fetchMock = mockPipeline(
+      pipelineResponse({
+        meeting_scores: [{ attend_score: 0.65, absent: false }],
+      }),
+    );
+    const client = makeClient('http://contrib.test');
+
+    const res = await client.computeMeetingScores(MEETING_REQ);
+    const u1 = res!.scores.find((s) => s.user_id === 1)!;
+    expect(u1.attendance_ratio).toBe(0.65);
+  });
+
+  it('①: 완전 결석이면 attendance_ratio는 0 (엔진이 attend_score=null을 줘도)', async () => {
+    fetchMock = mockPipeline(
+      pipelineResponse({
+        meeting_scores: [{ attend_score: null, absent: true }],
+      }),
+    );
+    const client = makeClient('http://contrib.test');
+
+    // user 1이 입장 기록이 전혀 없는 회의로 구성 — deriveMemberData가 absent=true로 파생
+    const req: MeetingScoreRequest = {
+      ...MEETING_REQ,
+      presence_events: [MEETING_REQ.presence_events[1]], // user 1 join 제거
+    };
+    const res = await client.computeMeetingScores(req);
+    const u1 = res!.scores.find((s) => s.user_id === 1)!;
+    expect(u1.attendance_ratio).toBe(0);
+  });
+
+  it('①: excused_late_user_ids에 포함된 멤버는 엔진 호출 시 excused_late=true로 전달된다', async () => {
+    // ①(단일 회의) 계산 경로는 사유 지각 승인 여부를 알 길이 없었다 — 회의 종료
+    // 직후 자동 계산 시점엔 보통 사유 신청이 아직 없어 문제가 안 됐지만, 시드나
+    // 재계산처럼 승인까지 끝난 뒤에 ①을 다시 계산하면 면제가 반영 안 된 값이
+    // 저장되는 회귀가 있었다. excused_late_user_ids로 명시적으로 전달해야 한다.
+    fetchMock = mockPipeline(pipelineResponse());
+    const client = makeClient('http://contrib.test');
+
+    await client.computeMeetingScores({
+      ...MEETING_REQ,
+      excused_late_user_ids: [1],
+    });
+
+    const body = callBody(fetchMock, 0);
+    expect(body.meetings[0].excused_late).toBe(true);
+  });
+
+  it('①: excused_late_user_ids에 없는 멤버는 excused_late=false로 전달된다', async () => {
+    fetchMock = mockPipeline(pipelineResponse());
+    const client = makeClient('http://contrib.test');
+
+    await client.computeMeetingScores({
+      ...MEETING_REQ,
+      excused_late_user_ids: [999], // user 1은 해당 없음
+    });
+
+    const body = callBody(fetchMock, 0);
+    expect(body.meetings[0].excused_late).toBe(false);
   });
 
   it('②③④ 멤버별 /pipeline/score 1회 — 원시 회의 행 + 액션 동봉, is_leader 전달', async () => {
