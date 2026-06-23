@@ -16,7 +16,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { showToast } = useToast();
   if (!token) {
     showToast("로그인이 필요합니다.");
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
@@ -26,6 +26,7 @@ export default function App() {
     <div className="app">
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
           path="/onboarding"
@@ -77,7 +78,7 @@ export default function App() {
         />
         <Route path="/terms" element={<TermsPage />} />
         {/* 정의되지 않은 경로는 로그인으로 */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       {/* useToast 훅이 DOM을 직접 조작하는 대상. React 상태 대신 DOM 조작 방식으로
           어느 컴포넌트에서든 호출 가능하고 리렌더 없이 즉시 표시됨. */}
