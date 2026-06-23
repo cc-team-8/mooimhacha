@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { MeetingAbsencesService } from './meeting-absences.service';
 
 // isLateByPresence는 주입 의존성(this.*Repo 등)을 쓰지 않고 인자만 사용하므로
@@ -65,14 +66,28 @@ describe('MeetingAbsencesService.isLateByPresence', () => {
 
 describe('MeetingAbsencesService.exceedsMaxLate', () => {
   const service = new MeetingAbsencesService(
-    null as never, null as never, null as never, null as never, null as never,
-    null as never, null as never, null as never, null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
   );
   const meeting = { t0_timestamp: new Date('2026-01-01T00:00:00Z') };
   const exceeds = (offsetMs: number, maxMin: number): boolean =>
     (
       service as unknown as {
-        exceedsMaxLate: (m: unknown, p: unknown, u: number, t: number) => boolean;
+        exceedsMaxLate: (
+          m: unknown,
+          p: unknown,
+          u: number,
+          t: number,
+        ) => boolean;
       }
     ).exceedsMaxLate(
       meeting,
@@ -94,7 +109,12 @@ describe('MeetingAbsencesService.exceedsMaxLate', () => {
     expect(
       (
         service as unknown as {
-          exceedsMaxLate: (m: unknown, p: unknown, u: number, t: number) => boolean;
+          exceedsMaxLate: (
+            m: unknown,
+            p: unknown,
+            u: number,
+            t: number,
+          ) => boolean;
         }
       ).exceedsMaxLate(meeting, [], 1, 30),
     ).toBe(false);
@@ -103,8 +123,17 @@ describe('MeetingAbsencesService.exceedsMaxLate', () => {
 
 describe('MeetingAbsencesService.deriveStatus (max 초과)', () => {
   const service = new MeetingAbsencesService(
-    null as never, null as never, null as never, null as never, null as never,
-    null as never, null as never, null as never, null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
+    null as never,
   );
   const derive = (
     hasJoined: boolean,
@@ -115,7 +144,11 @@ describe('MeetingAbsencesService.deriveStatus (max 초과)', () => {
     (
       service as unknown as {
         deriveStatus: (
-          h: boolean, s: unknown, a: unknown, l: boolean, e: boolean,
+          h: boolean,
+          s: unknown,
+          a: unknown,
+          l: boolean,
+          e: boolean,
         ) => string;
       }
     ).deriveStatus(
