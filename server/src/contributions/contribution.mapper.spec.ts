@@ -29,6 +29,8 @@ describe('mapTeamSettings — 우리 설정 → 외부 TeamSettingsSchema', () =
       weight_attend_in_meeting: 0.4,
       weight_task_in_final: 0.5,
       punctuality_grace_ratio: 0.1,
+      late_threshold_sec: 300, // 5분 → 초
+      late_max_sec: null, // late_max_minutes=0 → 상한 없음(null)
       absence_grace_sec: 30,
       leader_bonus: 0,
       action_chars_limit: 500,
@@ -47,6 +49,25 @@ describe('mapTeamSettings — 우리 설정 → 외부 TeamSettingsSchema', () =
       mapTeamSettings({ ...SETTINGS, leader_bonus_multiplier: 0.8 })
         .leader_bonus,
     ).toBe(0);
+  });
+
+  it('late_threshold_minutes/late_max_minutes(분) → late_threshold_sec/late_max_sec(초)로 변환한다', () => {
+    const result = mapTeamSettings({
+      ...SETTINGS,
+      late_threshold_minutes: 5,
+      late_max_minutes: 10,
+    });
+    expect(result.late_threshold_sec).toBe(300);
+    expect(result.late_max_sec).toBe(600);
+  });
+
+  it('late_max_minutes=0(상한 없음)이면 late_max_sec=null로 변환한다', () => {
+    const result = mapTeamSettings({
+      ...SETTINGS,
+      late_threshold_minutes: 5,
+      late_max_minutes: 0,
+    });
+    expect(result.late_max_sec).toBeNull();
   });
 
   it('lenient/strict 마감 모드는 그대로 전달한다', () => {
@@ -202,6 +223,19 @@ describe('deriveMemberData — 원시 이벤트 → 외부 MemberMeetingData', (
       presence_events: [join(1, 0)],
     });
     expect(deriveMemberData(req, 1).data.is_official).toBe(false);
+  });
+
+  it('excusedLate 인자를 안 넘기면 excused_late=false', () => {
+    const req = baseMeetingReq({ presence_events: [join(1, 300_000)] });
+    expect(deriveMemberData(req, 1).data.excused_late).toBe(false);
+  });
+
+  it('excusedLate=true 를 넘기면 그대로 excused_late=true 로 전달된다', () => {
+    const req = baseMeetingReq({ presence_events: [join(1, 300_000)] });
+    const { data } = deriveMemberData(req, 1, true);
+    expect(data.excused_late).toBe(true);
+    // 사유 지각이어도 late_sec 자체는 그대로 — 면제 여부 판단은 엔진이 한다
+    expect(data.late_sec).toBe(300);
   });
 });
 

@@ -54,16 +54,20 @@ export class ContributionClient {
       `[회의 산정] meeting_id=${payload.meeting.id} 참여자=${payload.participant_user_ids.length}명`,
     );
     const cfg = mapTeamSettings(payload.team_settings);
-    const thresholdSec = payload.team_settings.late_threshold_minutes * 60;
-    const maxSec =
-      payload.team_settings.late_max_minutes > 0
-        ? payload.team_settings.late_max_minutes * 60
-        : null;
-    const excusedLateSet = new Set(payload.excused_late_user_ids ?? []);
+    // ① 표시용 punctuality_score 의 "지각" 기준을 실제 점수 산정에 쓰이는
+    // late_threshold_sec(팀 설정의 지각 기준)과 일치시킨다. 과거엔 5분(300초)을
+    // 하드코딩해서, 팀이 지각 기준을 다르게 설정해도 화면 표시는 항상 5분 기준으로
+    // 나와 실제 점수와 어긋나는 문제가 있었다.
+    const lateThresholdSec = cfg.late_threshold_sec ?? 300;
     const scores = await Promise.all(
       payload.participant_user_ids.map(async (uid) => {
-        const { data, rawSpeechRatio } = deriveMemberData(payload, uid);
-        const isExcusedLate = excusedLateSet.has(uid);
+        const excusedLate =
+          payload.excused_late_user_ids?.includes(uid) ?? false;
+        const { data, rawSpeechRatio } = deriveMemberData(
+          payload,
+          uid,
+          excusedLate,
+        );
         // 비정규 회의도 ① 점수는 산출해야 하므로 official 로 보낸다
         // (officialness 는 누적(②) 포함 여부에만 쓰이고, ②는 별도 호출에서 반영).
         const ext = await this.pipeline(
@@ -71,28 +75,25 @@ export class ContributionClient {
           false,
           cfg,
         );
+        // attendance_ratio는 "참여 시간 비율"이 아니라 엔진이 계산한 attend_score
+        // (출석비율 + 지각 페널티, 사유 지각 면제 포함)를 저장한다. actual_attend_sec은
+        // 자발적 자리비움만 차감하고 지각 시간은 차감하지 않아, 그 값을 그대로 쓰면
+        // 지각해도 "참석 100%"로 표시되는 문제가 있었다 — 화면(회의 상세·리포트)에
+        // 노출되는 이름이 "참석/출석"이므로 실제로 지각이 반영된 값을 보여줘야 한다.
+        const meetingScore = ext.meeting_scores[0];
+        const attendanceRatio = data.absent
+          ? 0
+          : (meetingScore?.attend_score ?? null);
         return {
           user_id: uid,
           speech_ratio: rawSpeechRatio,
           speech_consistency: null,
-          attendance_ratio:
-            data.absent || (maxSec !== null && data.late_sec > maxSec)
-              ? 0
-              : data.meeting_total_sec > 0
-                ? Math.max(
-                    0,
-                    data.actual_attend_sec -
-                      (!isExcusedLate && data.late_sec > thresholdSec
-                        ? data.late_sec
-                        : 0),
-                  ) / data.meeting_total_sec
-                : null,
-          punctuality_score:
-            data.absent || (maxSec !== null && data.late_sec > maxSec)
-              ? null
-              : isExcusedLate || data.late_sec <= thresholdSec
-                ? 1.0
-                : 0.0,
+          attendance_ratio: attendanceRatio,
+          punctuality_score: data.absent
+            ? null
+            : data.late_sec > lateThresholdSec
+              ? 0.0
+              : 1.0,
           // 포함 0건(최소시간 미만 등) = 측정 불가 → null.
           // 무단 결석은 엔진이 0점으로 포함시키므로 0 이 저장된다.
           meeting_score:
@@ -138,18 +139,10 @@ export class ContributionClient {
               mt.absent_user_ids.includes(m.user_id),
           )
           .map((mt) => {
-            const { data } = deriveMemberData(mt, m.user_id);
-            // 지각 사유 승인자는 late_sec 를 0 으로 보내 외부 엔진도 패널티 없이 계산
-            const isExcusedLate = (mt.excused_late_user_ids ?? []).includes(
-              m.user_id,
-            );
-            const adjustedData = isExcusedLate
-              ? { ...data, late_sec: 0 }
-              : data;
+            const excusedLate = mt.excused_late_user_ids.includes(m.user_id);
+            const { data } = deriveMemberData(mt, m.user_id, excusedLate);
             // 무효 처리된 회의는 비정규로 보내 누적에서 제외시킨다
-            return mt.is_invalidated
-              ? { ...adjustedData, is_official: false }
-              : adjustedData;
+            return mt.is_invalidated ? { ...data, is_official: false } : data;
           });
         if (rows.length === 0 && actions.length === 0) {
           return {
@@ -262,6 +255,7 @@ function taskCarrierRow(userId: number): ExternalMemberMeetingData {
     audio_loss_pct: 0,
     speech_confidence: 1,
     excused_absence: true,
+    excused_late: false,
     absent: true,
     is_official: false,
   };

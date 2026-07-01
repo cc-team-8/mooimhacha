@@ -361,6 +361,18 @@ export class TeamsService {
         '지각 최대 인정 시간은 0(상한 없음) 또는 지각 기준 이상이어야 합니다.',
       );
     }
+    // 발언:출석 가중치는 엔진에서 "회의 내 비중"으로 합산되므로 합이 1.0이어야
+    // 설정 의도(예: "발언 60%, 출석 40%")와 실제 반영 비율이 일치한다.
+    // (엔진 자체는 합이 1이 아니어도 내부 재정규화로 깨지지 않지만, 그 경우 사용자가
+    // 입력한 숫자와 실제 적용 비율이 달라져 설정 화면이 거짓말을 하게 된다.)
+    const weightSum =
+      Number(settings.weight_speech_in_meeting) +
+      Number(settings.weight_attend_in_meeting);
+    if (Math.abs(weightSum - 1.0) > 1e-6) {
+      throw new BadRequestException(
+        '회의 내 발언 가중치와 출석 가중치의 합은 1.0이어야 합니다.',
+      );
+    }
     await this.settingsRepo.save(settings);
 
     return this.formatSettings(settings);

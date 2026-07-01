@@ -18,6 +18,10 @@ export interface MeetingScoreRequest {
   };
   team_settings: TeamSettingsPayload;
   participant_user_ids: number[];
+  // 이 회의에 대해 사유 지각이 승인된 멤버 — 지각 감점만 면제하고 출석 비율은
+  // 그대로 반영한다. 회의 종료 직후 ① 자동 계산 시점엔 보통 비어있지만(사유
+  // 신청이 아직 없으므로), 이후 재계산(예: 시드/배치)에서는 채워 보낼 수 있다.
+  excused_late_user_ids?: number[];
   utterances: {
     user_id: number;
     char_count: number;
@@ -36,8 +40,6 @@ export interface MeetingScoreRequest {
     event_type: string;
     timestamp_offset_ms: number;
   }[];
-  // 지각했지만 사유가 승인된 유저 — late_sec 차감 면제
-  excused_late_user_ids?: number[];
 }
 
 export interface MeetingScoreResult {
@@ -94,9 +96,11 @@ export interface TeamPipelineRequest {
   team_settings: TeamSettingsPayload;
   members: { user_id: number; role: string }[];
   // absent_user_ids: 무단결석(입장 X·사유결석 아님) 멤버 — 누적(②)에 0점으로 포함시킬 대상.
+  // excused_late_user_ids: 사유 지각(승인됨+실제 입장함) 멤버 — 지각 감점만 면제할 대상.
   meetings: (MeetingRawInput & {
     is_invalidated: boolean;
     absent_user_ids: number[];
+    excused_late_user_ids: number[];
   })[];
   action_items: TeamContributionRequest['action_items'];
 }
@@ -123,6 +127,8 @@ export interface TeamSettingsPayload {
   weight_speech_in_meeting: number;
   weight_attend_in_meeting: number;
   leader_bonus_multiplier: number;
+  // 지각 기준(분)/지각 최대 인정 시간(분) — late_max_minutes=0 은 "상한 없음".
+  // 엔진(late_threshold_sec/late_max_sec)에 그대로 전달해 실제 점수 산정에 반영한다.
   late_threshold_minutes: number;
   late_max_minutes: number;
 }

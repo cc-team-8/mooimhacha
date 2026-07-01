@@ -59,41 +59,23 @@ export class ContributionsService {
     if (!meeting) return [];
 
     const settings = await this.requireSettingsPayload(meeting.team_id);
-    const [
-      utterances,
-      agendas,
-      presence,
-      anomalies,
-      members,
-      approvedAbsences,
-    ] = await Promise.all([
-      // 산정에 쓰는 컬럼만 로드 (text TEXT 컬럼 제외 — 응답 크기·메모리 절약)
-      this.utteranceRepo.find({
-        where: { meeting_id: meetingId },
-        select: {
-          user_id: true,
-          char_count: true,
-          agenda_id: true,
-          confidence: true,
-        },
-      }),
-      this.agendaRepo.find({ where: { meeting_id: meetingId } }),
-      this.presenceRepo.find({ where: { meeting_id: meetingId } }),
-      this.anomalyRepo.find({ where: { meeting_id: meetingId } }),
-      this.membershipRepo.find({ where: { team_id: meeting.team_id } }),
-      this.absenceRepo.find({
-        where: { meeting_id: meetingId, status: 'approved' },
-        select: { user_id: true },
-      }),
-    ]);
-
-    // 지각 사유 승인자: join 기록 있음(지각) + 사유 approved → late_sec 차감 면제
-    const joinedSet = new Set(
-      presence.filter((p) => p.event_type === 'join').map((p) => p.user_id),
-    );
-    const excusedLateIds = approvedAbsences
-      .filter((a) => joinedSet.has(a.user_id))
-      .map((a) => a.user_id);
+    const [utterances, agendas, presence, anomalies, members] =
+      await Promise.all([
+        // 산정에 쓰는 컬럼만 로드 (text TEXT 컬럼 제외 — 응답 크기·메모리 절약)
+        this.utteranceRepo.find({
+          where: { meeting_id: meetingId },
+          select: {
+            user_id: true,
+            char_count: true,
+            agenda_id: true,
+            confidence: true,
+          },
+        }),
+        this.agendaRepo.find({ where: { meeting_id: meetingId } }),
+        this.presenceRepo.find({ where: { meeting_id: meetingId } }),
+        this.anomalyRepo.find({ where: { meeting_id: meetingId } }),
+        this.membershipRepo.find({ where: { team_id: meeting.team_id } }),
+      ]);
 
     const participantIds = members.map((m) => m.user_id);
 
@@ -126,7 +108,6 @@ export class ContributionsService {
         event_type: a.event_type,
         timestamp_offset_ms: a.timestamp_offset_ms,
       })),
-      excused_late_user_ids: excusedLateIds,
     };
 
     // 외부 산정 엔진(cc-team-8/Contribution)에 위임 — CONTRIBUTION_SERVICE_URL 필수
@@ -266,12 +247,49 @@ export class ContributionsService {
     const resultById = new Map(
       (response?.members ?? []).map((r) => [r.user_id, r]),
     );
+    // 승인된 사유 중 "결석"만 추려서 composite_score(②)와 동일한 규칙으로
+    // "출석" 표시(attendance_avg)에서도 해당 회의를 평균 계산 자체에서 뺀다.
+    // meeting_absences 테이블엔 결석/지각 구분 필드가 없어, presence_events에
+    // 입장(join/reconnect) 기록이 있는지로 구분한다 — 입장 기록이 없으면 결석,
+    // 있으면 늦게라도 참석한 지각이다.
+    // ⚠ 사유 지각 승인은 여기서 제외하면 안 된다: 사유 지각은 "지각 페널티만
+    // 면제"이고 출석 자체는 했으므로, 그 회의의 attend_score(이미 페널티가
+    // 면제된 값)가 평균에 그대로 들어가야 한다. 결석과 지각을 구분 안 하고
+    // 둘 다 빼면, 지각해서 참석한 회의까지 사라져 출석 평균이 실제보다
+    // 부풀려진다(데이터 1건이 통째로 빠지면서 남은 값들의 영향력이 커짐).
+    let approvedAbsenceKeys = new Set<string>();
+    if (meetings.length > 0) {
+      const meetingIds = meetings.map((m) => m.id);
+      const [approvedAbsences, allPresence] = await Promise.all([
+        this.absenceRepo.find({
+          where: { meeting_id: In(meetingIds), status: 'approved' },
+          select: { meeting_id: true, user_id: true },
+        }),
+        this.presenceRepo.find({
+          where: { meeting_id: In(meetingIds) },
+          select: { meeting_id: true, user_id: true, event_type: true },
+        }),
+      ]);
+      const joinedKeys = new Set(
+        allPresence
+          .filter(
+            (p) => p.event_type === 'join' || p.event_type === 'reconnect',
+          )
+          .map((p) => `${p.meeting_id}:${p.user_id}`),
+      );
+      approvedAbsenceKeys = new Set(
+        approvedAbsences
+          .filter((a) => !joinedKeys.has(`${a.meeting_id}:${a.user_id}`))
+          .map((a) => `${a.meeting_id}:${a.user_id}`),
+      );
+    }
     // 레이더(출석·참여도 축) 표시용 — 누적 집계와 같은 제외 규칙
-    // (무효 처리·비정규 회의 제외)으로 저장된 ① 비율을 단순 평균한다.
+    // (무효 처리·비정규 회의·승인된 사유결석 제외)으로 저장된 ① 비율을 평균한다.
     const ratiosById = new Map<number, { att: number[]; sp: number[] }>();
     for (const s of scores) {
       const m = meetingById.get(s.meeting_id);
       if (!m || m.is_invalidated || m.meeting_type !== 'regular') continue;
+      if (approvedAbsenceKeys.has(`${s.meeting_id}:${s.user_id}`)) continue;
       const slot = ratiosById.get(s.user_id) ?? { att: [], sp: [] };
       if (s.attendance_ratio != null) slot.att.push(Number(s.attendance_ratio));
       if (s.speech_ratio != null) slot.sp.push(Number(s.speech_ratio));
@@ -376,20 +394,22 @@ export class ContributionsService {
           pres.filter((p) => p.event_type === 'join').map((p) => p.user_id),
         );
         // 무단결석(입장 X·승인 사유결석 아님) — 누적(②)에 0점으로 포함시킬 멤버
+        const excusedIds = new Set(
+          (excusedByMeeting.get(m.id) ?? []).map((a) => a.user_id),
+        );
         const absent_user_ids = absentUnexcusedIds({
           meetingType: m.meeting_type,
           isInvalidated: m.is_invalidated,
           meetingAtMs: m.scheduled_at.getTime(),
           joinedIds: joined,
-          excusedIds: new Set(
-            (excusedByMeeting.get(m.id) ?? []).map((a) => a.user_id),
-          ),
+          excusedIds,
           activeMemberships,
         });
-        // 지각 사유 승인자: join 기록 있음(지각) + 사유 approved → late_sec 차감 면제
-        const excused_late_user_ids = (excusedByMeeting.get(m.id) ?? [])
-          .filter((a) => joined.has(a.user_id))
-          .map((a) => a.user_id);
+        // 사유 지각(승인됨 + 실제 입장함=joined) — 입장 자체를 안 한 사람은
+        // absentUnexcusedIds() 가 따로 보호하므로 여기서는 "늦게라도 들어온" 케이스만 해당.
+        const excused_late_user_ids = [...excusedIds].filter((uid) =>
+          joined.has(uid),
+        );
         return {
           meeting: {
             id: m.id,
@@ -462,12 +482,8 @@ export class ContributionsService {
       weight_speech_in_meeting: s?.weight_speech_in_meeting ?? 0.6,
       weight_attend_in_meeting: s?.weight_attend_in_meeting ?? 0.4,
       leader_bonus_multiplier: s?.leader_bonus_multiplier ?? 1.0,
-      late_threshold_minutes:
-        s?.late_threshold_minutes != null
-          ? Number(s.late_threshold_minutes)
-          : 5,
-      late_max_minutes:
-        s?.late_max_minutes != null ? Number(s.late_max_minutes) : 0,
+      late_threshold_minutes: s?.late_threshold_minutes ?? 5,
+      late_max_minutes: s?.late_max_minutes ?? 0,
     };
   }
 

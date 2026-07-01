@@ -23,6 +23,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
     "seed:scenario": "ts-node -r tsconfig-paths/register src/seed/seed-test-scenario.ts",
+    "seed:attendance-demo": "ts-node -r tsconfig-paths/register src/seed/seed-attendance-demo.ts",
     "migration:run:prod": "typeorm migration:run -d dist/data-source.js",
     "migration:revert:prod": "typeorm migration:revert -d dist/data-source.js",
     "migration:show:prod": "typeorm migration:show -d dist/data-source.js"
